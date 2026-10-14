@@ -26,26 +26,48 @@ Nearly every requirement falls out of that split:
 
 Rooms read as hierarchy even when the content is hierarchical, so the map is terrain:
 
-- The **trunk** runs east. Its stations are the talk's main points.
-- Each trunk station sends its **branch** up or down the slope, alternating sides.
-  Deeper detail turns east again. Each level is smaller (1, 0.62, 0.42, ...), so detail
-  is something you descend toward, not something you open.
+- The **trunk** runs east with a gentle meander. Its stations are the talk's main points.
+- Each trunk station sends its **branch** up or down, alternating sides. A branch leaves
+  steeply and bends downstream, the way a road climbs out of a valley. Deeper detail
+  starts forward and bends away from the trunk. Each level is smaller (1, 0.62, 0.42,
+  ...), so detail is something you descend toward, not something you open.
 - **Zoom is altitude.** From high up you read station names, as on a chart. Lower down,
   the placards become readable.
-- Labels are screen-space and fixed-size, with a halo, like map labels. Deeper levels'
-  labels appear only as you descend.
-- Placement is greedy: slide each subtree along its trail until it touches nothing.
-  There are no coordinates in the source, ever.
+- Placement is greedy: each station steps from the previous one along the current
+  heading, then slides forward until it touches nothing. Curves can't cause collisions,
+  however many branches there are. There are no coordinates in the source, ever.
+
+### 1a. One title per station, and no text too small to read
+
+Each card has two layers, and the camera picks one by how large the text would be on
+screen:
+
+- **Read**: the full content, shown only when body text is at least ~10px on screen.
+- **Glance**: the title set large, with placeholder bars standing in for paragraphs,
+  bullets, code and media (the way a page shows skeletons while loading). The bars show
+  how much is there without inviting anyone to squint. Below ~8px even the title
+  becomes a bar.
+
+The layers hand over in sequence, never overlapping, so a card never shows two titles.
+There are no separate floating map labels: the card is its own label.
 
 ### 2. Motion grammar
 
 In means detail. Out means context. Across means next. Nothing rotates. Audiences learn
 this within a couple of moves, and then the motion itself tells them where they are.
 
-Flights between stops follow van Wijk & Nuij (2003), *Smooth and efficient zooming
-and panning*. Between distant stops the camera climbs toward the ground they share and
-descends again, so a long jump shows how its two ends are related. Flight duration
-comes from the path length, so short hops are quick and long flights take longer.
+Every move ramps in, cruises, and ramps out: a trapezoid velocity profile with smooth
+ramps, about a third of the move each way. Nothing snaps.
+
+- **Neighbouring stops: follow the trail.** The camera rides the trail's own curve,
+  rising a little mid-way to show the land around, and the route line draws itself
+  right under the camera. Typical hops take 1.6 to 2 seconds.
+- **Longer jumps: fly.** Pull-backs, detours and jumps across branches follow van Wijk &
+  Nuij (2003), *Smooth and efficient zooming and panning*. The camera climbs toward the
+  ground the two ends share and descends again, so a long jump shows how they relate.
+
+Durations come from distance travelled, measured in screens, so short hops stay short
+and long flights take longer, up to a cap set by the skin.
 
 ### 3. Source format: Markdown, with no invented syntax
 
@@ -134,10 +156,22 @@ trail toward the horizon". That's a change to the lens, not a new engine.
 
 ### 8. The handoff replaces "notes + a link to the slides"
 
-A QR code on the final view opens explore mode on the viewer's phone. On a phone the
-map stays on top and the stop's text reads in a sheet below, like a maps app. Each
-trunk stop can carry a one-line takeaway, so the concise notes you hand out today
-become the first thing the phone shows.
+A QR code on the final view opens the deck on the viewer's phone. A shrunken
+presentation doesn't work on a phone, so small screens get a different view of the
+same map, a **strip map**. Old road atlases unrolled a journey into a vertical strip
+in the same way.
+
+- The route becomes one scrolling column of readable cards. Scrolling is walking.
+- A rail down the left shows the trunk, with branches peeling off as indented side
+  lines. It lights up in the route color down to the reading line.
+- Detours are folded away and open on a tap.
+- The landscape is one tap away (**Map**). It opens at your reading position with the
+  trail lit up to there, and tapping any station takes you back to that point in the
+  strip.
+
+Strip mode applies whenever the screen is under 760px wide or 500px tall, so phones
+in landscape get it too. Each trunk stop can carry a one-line takeaway, so the concise
+notes you hand out today can lead the strip.
 
 ### 9. Offline and private by default
 
@@ -173,11 +207,20 @@ be installed on a locked-down work machine.
 ## The prototype (`spike/`)
 
 A throwaway, single-file proof of the riskiest part: does the motion feel right? It
-includes a tiny Markdown parser, the landscape layout, contour terrain shaped around
-the stations, van Wijk flights, the lit trail, the route with detours and rejoin,
-explore by drag/wheel/pinch, the minimap, two skins in light and dark, the remote
-profile, the tour scrubber, the phone sheet, and a capture tool that renders the
-route to MP4.
+includes:
+
+- a tiny Markdown parser
+- the curved landscape layout, and contour terrain shaped around the stations
+- glance cards
+- trail-following and van Wijk flights, and the lit trail
+- the route, with detours and rejoin
+- explore by drag, wheel and pinch, plus the minimap
+- two skins in light and dark, and the remote profile
+- the tour scrubber
+- the strip map for small screens
+- a capture tool that renders the route to MP4
+
+Add `?view=strip` or `?view=present` to the URL to force either layout.
 
 Run it by opening `spike/index.html` in a browser. Keys: → / ← travel, ↓ detour,
 ↑ pull back, M map, V tour, R remote motion, T skin, ? help.
@@ -204,10 +247,21 @@ What it taught us so far:
 - The final pull-back with the walked route lit is the strongest moment, and it costs
   nothing extra to author.
 
+From the first review:
+
+- Tiny text invites squinting. Glance cards with placeholder bars fixed it, and the map
+  now reads at a glance.
+- Fast, evenly paced moves felt like jumps. Ramped moves along the trail itself feel
+  like travelling a path.
+- Floating labels duplicated card titles and overlapped cards. Making the card its own
+  label removed both problems.
+- The presentation shrunk onto a phone didn't work, even in landscape. The strip map
+  replaces it.
+
 ## Open questions
 
 1. Card shape: fixed 16:10 placards, or sized to their content?
-2. Phone handoff: map plus sheet (prototyped), or a vertical "trail view"?
+2. How much should branches curve? The bend is a per-skin setting waiting to happen.
 3. Route syntax for named routes: a list in frontmatter, or a sidecar `*.route` file?
 4. Takeaway syntax: a `> takeaway:` line, or the first sentence of each trunk stop?
 5. Follow link: is a relay acceptable for work talks, or personal/consultancy only?
