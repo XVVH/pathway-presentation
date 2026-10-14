@@ -67,6 +67,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   let mode: "live" | "tour" | "capture" = capture ? "capture" : "live";
   let tour: (Tour & { playing: boolean; t: number; origin: number }) | null = null;
   let dirty = true, introHint = true, assetsReady = false;
+  let notice = "", noticeTimer = 0;
   let stripMode = false, mapOpen = false, hoverOn = true, hoverNode: MapNode | null = null, blank = false;
   const motion = (): MotionContext => ({ map, viewport: vp, profile: reducedMotion ? "reduced" : profile, flight: tokens.flight });
 
@@ -204,7 +205,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     hud.crumbs.innerHTML = crumbsFor(map, target);
     if (mode !== "live" || stripMode) return;
     const ds = nav.detours();
-    const hint = introHint ? '<div class="hint">Press → to travel, ? for the legend.</div>' : "";
+    const hint = notice ? `<div class="hint">${esc(notice)}</div>` : introHint ? '<div class="hint">Press → to travel, ? for the legend.</div>' : "";
     hud.status.innerHTML = `<div>${positionLine(nav)}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].stop.title)}</div>` : ""}${hint}`;
   }
 
@@ -320,6 +321,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       const url = `${location.href.split(/[?#]/)[0]}?presenter=${token}`;
       const w = window.open(url, `pathway-presenter-${hash(payload.title)}`, "popup,width=1180,height=760");
       if (w) win = w;
+      else flash("The presenter window was blocked. Allow pop-ups for this page, then press P again.");
     }
     return { send, open };
   })();
@@ -336,6 +338,13 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       case "visit": { const n = map.byId.get(c.id); if (n) visit(n); break; }
       case "route": if (presenting()) { const t = nav.useRoute(c.name); if (t) go(t); else { updateHud(); savePosition(); link.send(); } } break;
     }
+  }
+  /** A short message in the status line, for things the presenter should know now. */
+  function flash(message: string): void {
+    notice = message;
+    updateHud();
+    clearTimeout(noticeTimer);
+    noticeTimer = window.setTimeout(() => { notice = ""; updateHud(); }, 6000);
   }
   function setBlank(on: boolean): void {
     blank = on;

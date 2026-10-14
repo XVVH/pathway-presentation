@@ -1347,6 +1347,7 @@
     let mode = capture ? "capture" : "live";
     let tour = null;
     let dirty = true, introHint = true, assetsReady = false;
+    let notice = "", noticeTimer = 0;
     let stripMode = false, mapOpen = false, hoverOn = true, hoverNode = null, blank = false;
     const motion = () => ({ map, viewport: vp, profile: reducedMotion ? "reduced" : profile, flight: tokens.flight });
     function measure() {
@@ -1506,7 +1507,7 @@
       hud.crumbs.innerHTML = crumbsFor(map, target);
       if (mode !== "live" || stripMode) return;
       const ds = nav.detours();
-      const hint = introHint ? '<div class="hint">Press → to travel, ? for the legend.</div>' : "";
+      const hint = notice ? `<div class="hint">${esc(notice)}</div>` : introHint ? '<div class="hint">Press → to travel, ? for the legend.</div>' : "";
       hud.status.innerHTML = `<div>${positionLine(nav)}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].stop.title)}</div>` : ""}${hint}`;
     }
     let lastHudTarget = null;
@@ -1653,6 +1654,7 @@
         const url = `${location.href.split(/[?#]/)[0]}?presenter=${token}`;
         const w = window.open(url, `pathway-presenter-${hash(payload.title)}`, "popup,width=1180,height=760");
         if (w) win = w;
+        else flash("The presenter window was blocked. Allow pop-ups for this page, then press P again.");
       }
       return { send, open };
     })();
@@ -1697,6 +1699,15 @@
           }
           break;
       }
+    }
+    function flash(message) {
+      notice = message;
+      updateHud();
+      clearTimeout(noticeTimer);
+      noticeTimer = window.setTimeout(() => {
+        notice = "";
+        updateHud();
+      }, 6e3);
     }
     function setBlank(on) {
       blank = on;
