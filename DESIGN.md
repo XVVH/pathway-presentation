@@ -57,11 +57,12 @@ a little later at ~6-7px, because they are bigger to begin with.
   find-in-page still see all of it.
 
 **Hover (mouse only, never required).** Zooming to read is the fun of this format, so
-hover should invite the trip, not replace it. The default, **path**, lifts the station
-with a ring and draws the trail from where you are to it as a dashed route line; one
-click flies there. **Name** also shows the title when it is too small to read. **Off**
-keeps the map silent. Moving the camera or pressing a key clears hover, so a presenter's
-idle cursor never decorates the screen.
+hover invites the trip instead of replacing it. Pointing at a station rings it and
+lights the unwalked trail from where you are to it, dash for dash over the trail
+beneath (same pattern, same start, same direction, so the two never interleave). One
+click flies there. Hover never shows the title: the reveal is earned by travelling.
+Moving the camera or pressing a key clears hover, so a presenter's idle cursor never
+decorates the screen.
 
 ### 2. Motion grammar
 
@@ -223,7 +224,7 @@ includes:
 
 - a tiny Markdown parser
 - the curved landscape layout, and contour terrain shaped around the stations
-- greek-in-place cards, and hover previews
+- greek-in-place cards, and hover trail previews
 - trail-following and van Wijk flights, and the lit trail
 - the route, with detours and rejoin
 - explore by drag, wheel and pinch, plus the minimap

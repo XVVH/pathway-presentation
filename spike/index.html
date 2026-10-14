@@ -120,12 +120,6 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
 .bars .bar { position: absolute; border-radius: 999px; background: var(--skeleton); }
 .bars .title .bar { background: var(--skeleton-strong); }
 .bars .bar.dot { background: var(--route); opacity: 0.45; }
-#tip {
-  position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; white-space: nowrap;
-  font: 600 13px/1 var(--font-display); letter-spacing: 0.07em; text-transform: var(--display-case); color: var(--ink);
-  background: var(--card); border: 1px solid var(--rule); border-bottom: 2px solid var(--route); border-radius: 4px;
-  padding: 5px 8px 4px; box-shadow: 0 6px 18px -8px var(--shadow);
-}
 
 .eyebrow {
   display: flex; gap: 1.6cqw; align-items: baseline;
@@ -279,7 +273,6 @@ button .k { color: var(--ink-2); margin-right: 6px; }
 <div id="stage" tabindex="0" aria-label="Pathway map. Use arrow keys to travel.">
   <canvas id="ground"></canvas>
   <div id="world"></div>
-  <div id="tip" hidden></div>
   <div id="hud">
     <div class="hud-row">
       <div id="crumbs" class="pill"></div>
@@ -321,7 +314,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <dt>R</dt><dd>Motion: cinematic or remote (for screen share).</dd>
         <dt>T</dt><dd>Skin: Sectional or Boardroom.</dd>
         <dt>C</dt><dd>Curves: gentle, bold, or winding.</dd>
-        <dt>H</dt><dd>Hover a station to see the trail there, its name, or nothing.</dd>
+        <dt>H</dt><dd>Hover a station to light the trail there. H turns it off.</dd>
         <dt>Drag, wheel, pinch</dt><dd>Explore freely. Click any station to fly there.</dd>
       </dl>
       <p>Keys work once this page has keyboard focus, so click anywhere first. Press ? to bring this legend back. On a narrow screen the route becomes a scrolling strip.</p>
@@ -1116,12 +1109,13 @@ function render(tl, t) {
     world();
   }
   // trails: dashed where unwalked, the route color where walked
+  const trailDash = (e, k) => (e.detour ? [2 / k, 7 / k] : [7 / k, 6 / k]);
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   for (const e of edges) {
     ctx.beginPath(); ctx.moveTo(e.pts[0].x, e.pts[0].y);
     for (const p of e.pts) ctx.lineTo(p.x, p.y);
     ctx.strokeStyle = T.trail; ctx.lineWidth = (e.trunk ? 1.8 : 1.4) / k;
-    ctx.setLineDash(e.detour ? [2 / k, 7 / k] : [7 / k, 6 / k]);
+    ctx.setLineDash(trailDash(e, k));
     ctx.stroke();
   }
   ctx.setLineDash([]);
@@ -1145,12 +1139,16 @@ function render(tl, t) {
     }
     ctx.strokeStyle = T.route; ctx.lineWidth = (e.trunk ? 3.4 : 2.6) / k; ctx.stroke();
   }
-  // hover: preview the trail from where you are to the station under the cursor
+  // hover: light up the unwalked trail from where you are to the station under the
+  // cursor. Same dash pattern, same start, same direction as the trail beneath, so
+  // each route-colored dash lands exactly on a trail dash instead of fighting it.
   if (hoverNode && mode === "live" && hoverMode !== "off") {
     const from = currentTarget().node || root;
-    ctx.setLineDash([9 / k, 7 / k]); ctx.strokeStyle = T.route; ctx.globalAlpha = 0.55; ctx.lineWidth = 3 / k;
+    ctx.strokeStyle = T.route;
     for (const p of trailPath(from, hoverNode)) {
+      if ((lit.get(p.id)?.f ?? 0) >= 1) continue;
       const e = byId[p.id].edge;
+      ctx.setLineDash(trailDash(e, k)); ctx.lineDashOffset = 0; ctx.lineWidth = (e.trunk ? 2.8 : 2.4) / k;
       ctx.beginPath(); e.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke();
     }
     ctx.setLineDash([]); ctx.globalAlpha = 0.9; ctx.lineWidth = 2.5 / k;
@@ -1437,12 +1435,11 @@ document.getElementById("btn-skin").onclick = toggleSkin;
 document.getElementById("btn-bend").onclick = cycleBend;
 document.getElementById("btn-hover").onclick = cycleHover;
 
-// Hover (mouse only). "path" previews the trail to a station and invites the trip;
-// "name" also names it when its title is too small to read; "off" leaves the
-// map silent. Touch has no hover, so nothing here is ever required.
-const HOVER = { path: "Hover: path", name: "Hover: name", off: "Hover: off" };
-let hoverMode = "path", hoverNode = null, hoverPt = null;
-const tipEl = document.getElementById("tip");
+// Hover (mouse only). Pointing at a station lights the trail from where you are to
+// it and rings it: an invitation to make the trip, not a preview of what's there.
+// Touch has no hover, so nothing here is ever required.
+const HOVER = { path: "Hover: path", off: "Hover: off" };
+let hoverMode = "path", hoverNode = null;
 function cycleHover() {
   const order = Object.keys(HOVER);
   hoverMode = order[(order.indexOf(hoverMode) + 1) % order.length];
@@ -1450,20 +1447,12 @@ function cycleHover() {
   setHover(null);
 }
 function setHover(n) {
-  if (n !== hoverNode) { hoverNode = n; dirty = true; stage.style.cursor = n ? "zoom-in" : ""; }
-  const L = n?.lod?.find(l => l.kind === "title");
-  const small = n && (!L || L.px * (n.ww * vw / camNow().w / cw) < 9);
-  tipEl.hidden = !(n && hoverMode === "name" && small);
-  if (!tipEl.hidden && hoverPt) {
-    const r = stage.getBoundingClientRect();
-    tipEl.textContent = n.title;
-    tipEl.style.transform = `translate(${hoverPt.x - r.left + 14}px, ${hoverPt.y - r.top + 18}px)`;
-  }
+  if (n === hoverNode) return;
+  hoverNode = n; dirty = true; stage.style.cursor = n ? "zoom-in" : "";
 }
 stage.addEventListener("pointermove", e => {
   if (e.pointerType !== "mouse" || mode !== "live") return;
   if (drag || hoverMode === "off" || e.target.closest("#hud button, #hud .pill, #help")) { setHover(null); return; }
-  hoverPt = { x: e.clientX, y: e.clientY };
   setHover(hitTest(e.clientX, e.clientY));
 });
 stage.addEventListener("pointerleave", () => setHover(null));
