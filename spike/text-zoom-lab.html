@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zoom Text Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a header with transport controls, then four synchronized panels. Each
+   panel runs the same camera over the same five stations; only the way text
+   behaves as it shrinks differs. Throwaway: the winner moves into the prototype. */
+@font-face { font-family: "Barlow"; src: url("media/fonts/barlow-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("media/fonts/barlow-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("media/fonts/barlow-condensed-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("media/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("media/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("media/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+:root {
+  --paper: #E6EAE2;
+  --ground: #EDF0EA;
+  --trail: #8E98A7;
+  --route: #B3127C;
+  --card: #FCFCFA;
+  --rule: #D5DACF;
+  --ink: #1A2130;
+  --ink-2: #566071;
+  --skeleton: #DFE3DA;
+  --skeleton-strong: #C4CBBF;
+  --shadow: rgba(26, 33, 48, 0.16);
+  --hud-bg: rgba(237, 240, 234, 0.9);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0A0F19; --ground: #0E1420; --trail: #55627A; --route: #F0489F; --card: #151D2B; --rule: #253147;
+    --ink: #E5E9F0; --ink-2: #97A2B4; --skeleton: #222C3F; --skeleton-strong: #34425E;
+    --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(14, 20, 32, 0.88); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0A0F19; --ground: #0E1420; --trail: #55627A; --route: #F0489F; --card: #151D2B; --rule: #253147;
+  --ink: #E5E9F0; --ink-2: #97A2B4; --skeleton: #222C3F; --skeleton-strong: #34425E;
+  --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(14, 20, 32, 0.88); color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); display: flex; flex-direction: column; }
+.top {
+  display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px;
+  padding-block: 14px 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top h1 { margin: 0; font: 600 22px/1 var(--font-display); letter-spacing: 0.05em; text-transform: uppercase; }
+.top p { margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: var(--ink-2); max-width: 68ch; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 500 12px/1 var(--font-mono); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.controls input[type="range"] { width: min(280px, 50vw); accent-color: var(--route); }
+button {
+  font: 500 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink); cursor: pointer;
+  background: var(--hud-bg); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
+}
+button[aria-pressed="true"] { border-color: var(--route); color: var(--route); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
+.grid {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px;
+  padding-bottom: 14px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--ground); }
+.panel > header { flex-shrink: 0; padding: 9px 12px 8px; background: var(--hud-bg); border-bottom: 1px solid var(--rule); z-index: 3; }
+.panel > header b { font: 600 14px/1.2 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.panel > header .n { color: var(--route); font: 500 12px/1 var(--font-mono); margin-right: 8px; }
+.panel > header span.d { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.4; color: var(--ink-2); }
+@media (max-width: 760px) {
+  html, body { height: auto; }
+  .grid { grid-template-columns: 1fr; grid-template-rows: none; }
+  .panel { height: 64vh; }
+}
+.scene { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.scene svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scene svg path { fill: none; stroke: var(--trail); stroke-width: 1.6; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
+.world, .signs { position: absolute; inset: 0; pointer-events: none; }
+
+.card {
+  position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch); transform-origin: 0 0; container-type: size;
+  background: var(--card); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; visibility: hidden;
+  box-shadow: 0 18px 50px -24px var(--shadow), 0 2px 6px -2px var(--shadow);
+}
+.c-in, .read, .glance { position: absolute; inset: 0; }
+.c-in { padding: 6cqw 6.5cqw; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.grp { position: relative; width: 100%; }
+.bars { position: absolute; inset: 0; pointer-events: none; }
+.bar { position: absolute; border-radius: 999px; background: var(--skeleton); opacity: 0; }
+.t-grp .bar { background: var(--skeleton-strong); }
+.eyebrow { display: flex; gap: 1.6cqw; font: 500 1.75cqw/1.2 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 2.2cqw; }
+.eyebrow .num { color: var(--route); }
+h2 { margin: 0 0 2.6cqw; font: 600 6.6cqw/1.02 var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance; color: var(--ink); }
+.md p { margin: 0 0 0.6em; font-size: 3.3cqw; line-height: 1.4; color: var(--ink-2); }
+.md p:first-child { color: var(--ink); }
+.md p:last-child { margin-bottom: 0; }
+.md strong { color: var(--ink); font-weight: 600; }
+.ap-held .t-grp { width: auto; max-width: 64%; transform-origin: 0 0; }
+.ap-now .glance { padding: 6cqw 7cqw; display: flex; flex-direction: column; justify-content: center; gap: 3cqw; opacity: 0; }
+.g-title { position: relative; }
+.g-text { font: 600 var(--gt)/1.02 var(--font-display); text-transform: uppercase; color: var(--ink); text-wrap: balance; }
+.g-bar { position: absolute; left: 0; top: 0; width: 70%; height: calc(var(--gt) * 0.8); border-radius: 1.4cqw; background: var(--skeleton-strong); opacity: 0; }
+.g-lines { display: flex; flex-direction: column; gap: 2.2cqw; }
+.g-line { height: 2.8cqw; border-radius: 1.4cqw; background: var(--skeleton); }
+.sign {
+  position: absolute; left: 0; top: 0; white-space: nowrap; opacity: 0;
+  font: 600 12.5px/1 var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink);
+  background: var(--card); border: 1px solid var(--rule); border-bottom: 2px solid var(--route); border-radius: 4px; padding: 4px 7px 3px;
+}
+.foot { margin: 0; padding: 0 16px 16px; font: 500 11px/1.5 var(--font-mono); letter-spacing: 0.06em; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <h1>Zoom text lab</h1>
+    <p>Four ways to handle text that gets too small as the camera pulls back. All four panels run the same camera at the same time. Pick one title and follow it through a whole loop, in and out.</p>
+  </div>
+  <div class="controls">
+    <button id="play" type="button" aria-pressed="true">Pause</button>
+    <button id="slow" type="button" aria-pressed="false">Half speed</button>
+    <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Position in the loop">
+    <span id="clock">0.0s</span>
+  </div>
+</div>
+<div class="grid" id="grid"></div>
+<p class="foot">Throwaway prototype. The winner, or a blend, moves into the main prototype.</p>
+
+<script>
+"use strict";
+(() => {
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+function rampEase(r) {
+  const vmax = 1 / (1 - r);
+  const up = t => vmax * (t / 2 - (r / (2 * Math.PI)) * Math.sin(Math.PI * t / r));
+  return t => { t = clamp(t); if (t < r) return up(t); if (t > 1 - r) return 1 - up(1 - t); return vmax * (r / 2 + t - r); };
+}
+const RAMP = rampEase(0.34);
+function zoomPath(a, b, rho = Math.SQRT2) {
+  const rho2 = rho * rho, rho4 = rho2 * rho2, dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+  if (d2 < 1e-6) { const S = Math.log(b.w / a.w) / rho; return t => ({ x: a.x + t * dx, y: a.y + t * dy, w: a.w * Math.exp(rho * t * S) }); }
+  const d1 = Math.sqrt(d2);
+  const b0 = (b.w * b.w - a.w * a.w + rho4 * d2) / (2 * a.w * rho2 * d1), b1 = (b.w * b.w - a.w * a.w - rho4 * d2) / (2 * b.w * rho2 * d1);
+  const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0), r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1), S = (r1 - r0) / rho, c0 = Math.cosh(r0);
+  return t => { const s = t * S, u = a.w / (rho2 * d1) * (c0 * Math.tanh(rho * s + r0) - Math.sinh(r0)); return { x: a.x + u * dx, y: a.y + u * dy, w: a.w * c0 / Math.cosh(rho * s + r0) }; };
+}
+
+const BASE_W = 1600, BASE_H = 1000, SCALE = { 2: 1, 3: 0.62 };
+const CARDS = [
+  { id: "map", level: 2, x: 0, y: 0, stop: "Stop 04", parent: "", title: "A map and a route", body: ["The <strong>map</strong> is the content: every idea has a place.", "The <strong>route</strong> is the talk: one path through the map."] },
+  { id: "computed", level: 3, x: 250, y: 1300, stop: "Stop 05", parent: "A map and a route", title: "The map is computed", body: ["There are no coordinates in the source. Main stops run along the trunk. Detail branches off as side trails, smaller and further out."] },
+  { id: "route", level: 3, x: 1150, y: 2250, stop: "Stop 06", parent: "A map and a route", title: "The route is reading order", body: ["Stops follow the file from top to bottom. When a branch ends, the camera pulls back over the trail you just walked."] },
+  { id: "explore", level: 3, x: 2350, y: 2900, stop: "Stop 08", parent: "A map and a route", title: "Explore is the map without a route", body: ["Drag, zoom, and tap any station. This is what the audience keeps after the talk."] },
+  { id: "motion", level: 2, x: 2650, y: -150, stop: "Stop 09", parent: "", title: "How it moves", body: ["In means detail. Out means context. Across means next. Nothing rotates."] },
+];
+CARDS.forEach(c => { c.ww = BASE_W * SCALE[c.level]; c.wh = BASE_H * SCALE[c.level]; });
+const byId = Object.fromEntries(CARDS.map(c => [c.id, c]));
+const TRAILS = [["map", "computed"], ["computed", "route"], ["route", "explore"], ["map", "motion"]];
+const bbox = CARDS.reduce((b, c) => ({ x0: Math.min(b.x0, c.x - c.ww / 2), y0: Math.min(b.y0, c.y - c.wh / 2), x1: Math.max(b.x1, c.x + c.ww / 2), y1: Math.max(b.y1, c.y + c.wh / 2) }), { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
+
+const APPROACHES = [
+  { key: "now", name: "Now: swap to a glance card", desc: "When body text gets small, the card swaps to a large title with placeholder bars. The map reads well, but the title jumps in size and rewraps while you read it." },
+  { key: "greek", name: "Greek in place", desc: "Nothing ever resizes or moves. Each line dissolves into a bar the shape of itself when it gets too small to read. Titles hold out longest." },
+  { key: "held", name: "Held title", desc: "The title keeps its line breaks and holds a readable size, like a map label, while the card grows or shrinks around it. Body lines dissolve in place." },
+  { key: "sign", name: "Signpost", desc: "The card only ever scales and dissolves in place. Once its own title is too small to read, a fixed-size sign on its top edge names it." },
+];
+
+// Panels
+const grid = document.getElementById("grid");
+const panels = APPROACHES.map((a, i) => {
+  const el = document.createElement("section");
+  el.className = `panel ap-${a.key}`;
+  el.innerHTML = `<header><span class="n">${i + 1}</span><b>${a.name}</b><span class="d">${a.desc}</span></header>
+    <div class="scene"><svg aria-hidden="true">${TRAILS.map(([f, t]) => { const A = byId[f], B = byId[t]; const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2; return `<path d="M${A.x} ${A.y} Q${A.x} ${my} ${mx} ${my} T${B.x} ${B.y}"/>`; }).join("")}</svg><div class="world"></div>${a.key === "sign" ? '<div class="signs"></div>' : ""}</div>`;
+  grid.appendChild(el);
+  const world = el.querySelector(".world"), signs = el.querySelector(".signs");
+  const cards = CARDS.map(c => {
+    const card = document.createElement("article");
+    card.className = "card";
+    const eyebrow = `<header class="eyebrow"><span class="num">${c.stop}</span>${c.parent ? `<span>${c.parent}</span>` : ""}</header>`;
+    const read = `<div class="c-in"><div class="grp e-grp">${eyebrow}<div class="bars"></div></div><div class="grp t-grp"><h2>${c.title}</h2><div class="bars"></div></div><div class="grp b-grp"><div class="md">${c.body.map(p => `<p>${p}</p>`).join("")}</div><div class="bars"></div></div></div>`;
+    if (a.key === "now") {
+      const gt = c.level >= 3 ? 13 : 10.5;
+      card.innerHTML = `<div class="read">${read}</div><div class="glance" style="--gt:${gt}cqw"><div class="g-title"><div class="g-text">${c.title}</div><span class="g-bar"></span></div><div class="g-lines">${c.body.map(() => '<span class="g-line" style="width:92%"></span><span class="g-line" style="width:64%"></span>').join("")}</div></div>`;
+      c.gt = gt / 100;
+    } else card.innerHTML = read;
+    world.appendChild(card);
+    const q = s => card.querySelector(s);
+    const rec = { c, card, e: q(".e-grp"), t: q(".t-grp"), b: q(".b-grp"), read: q(".read"), glance: q(".glance"), gText: q(".g-text"), gBar: q(".g-bar"), op: {} };
+    if (signs) { rec.sign = document.createElement("div"); rec.sign.className = "sign"; rec.sign.textContent = c.title; signs.appendChild(rec.sign); }
+    return rec;
+  });
+  return { el, a, scene: el.querySelector(".scene"), svg: el.querySelector("svg"), world, cards };
+});
+
+// Layout and measurement: lay each card out at reading size, then record the
+// exact box of every line of text so placeholder bars can sit where the words are.
+let pw = 1, ph = 1, cw = 1, ch = 1, seq = [], total = 1;
+function lineBoxes(el, origin) {
+  const out = [];
+  for (const node of el.querySelectorAll("p, h2, header")) {
+    const r = document.createRange(); r.selectNodeContents(node);
+    for (const q of r.getClientRects()) {
+      if (q.width < 1) continue;
+      const line = out.find(L => L.node === node && Math.abs(L.top - q.top) < 3);
+      if (line) { line.left = Math.min(line.left, q.left); line.right = Math.max(line.right, q.right); line.bottom = Math.max(line.bottom, q.bottom); }
+      else out.push({ node, top: q.top, bottom: q.bottom, left: q.left, right: q.right });
+    }
+  }
+  return out.map(L => ({ x: L.left - origin.left, y: L.top - origin.top, w: L.right - L.left, h: L.bottom - L.top }));
+}
+function measure() {
+  const s = panels[0].scene;
+  pw = s.clientWidth; ph = s.clientHeight;
+  cw = Math.round(Math.min(pw * 0.62, ph * 0.72 * 1.6)); ch = Math.round(cw / 1.6);
+  for (const p of panels) {
+    p.world.style.setProperty("--cw", cw + "px"); p.world.style.setProperty("--ch", ch + "px");
+    for (const r of p.cards) {
+      r.card.style.transform = "none";
+      r.op = {};
+      for (const g of [r.e, r.t, r.b]) {
+        if (!g) continue;
+        g.style.transform = "none";
+        const bars = g.querySelector(".bars"), origin = g.getBoundingClientRect();
+        bars.innerHTML = lineBoxes(g, origin).map(L => {
+          const h = L.h * 0.52, y = L.y + (L.h - h) / 2 + L.h * 0.04;
+          return `<span class="bar" style="left:${L.x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${L.w.toFixed(1)}px;height:${h.toFixed(1)}px"></span>`;
+        }).join("");
+      }
+      if (p.a.key === "held") {
+        const tr = r.t.getBoundingClientRect(), inner = r.card.querySelector(".c-in"), cs = getComputedStyle(inner);
+        const contentW = inner.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const titleW = Math.max(...lineBoxes(r.t, tr).map(L => L.w));
+        r.G = clamp(contentW / titleW, 1, 2.6); r.titleH = tr.height;
+      }
+    }
+  }
+  const fit = (b, pad) => { const k = Math.min(pw / ((b.x1 - b.x0) * pad), ph / ((b.y1 - b.y0) * pad)); return { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2, w: pw / k }; };
+  const focus = id => { const c = byId[id]; return { x: c.x, y: c.y, w: pw * c.ww / cw }; };
+  const over = fit(bbox, 1.08), fA = focus("map"), fB = focus("computed"), fC = focus("route");
+  seq = [
+    { hold: over, d: 1.6 }, { fly: [over, fA], d: 2.3 }, { hold: fA, d: 1.8 }, { fly: [fA, fB], d: 2.1 },
+    { hold: fB, d: 2.0 }, { fly: [fB, fC], d: 1.9 }, { hold: fC, d: 2.0 }, { fly: [fC, over], d: 2.5 },
+  ];
+  seq.forEach(s => { if (s.fly) s.f = zoomPath(s.fly[0], s.fly[1]); });
+  total = seq.reduce((a, s) => a + s.d, 0);
+}
+function camAt(t) {
+  t = ((t % total) + total) % total;
+  for (const s of seq) { if (t <= s.d) return s.hold ? s.hold : s.f(RAMP(t / s.d)); t -= s.d; }
+  return seq[0].hold;
+}
+
+// Per-frame behaviour for each approach
+function setOp(r, key, el, v) { const q = Math.round(v * 50) / 50; if (r.op[key] === q) return; r.op[key] = q; el.style.opacity = q; }
+function dissolve(r, key, grp, px, a, b) {
+  const text = smoothstep(a, b, px);
+  setOp(r, key, grp.firstElementChild, text);
+  if (r.op[key + "b"] !== Math.round((1 - text) * 50) / 50) { r.op[key + "b"] = Math.round((1 - text) * 50) / 50; for (const bar of grp.querySelectorAll(".bar")) bar.style.opacity = r.op[key + "b"]; }
+}
+const EYE = 0.0175, TITLE = 0.066, BODY = 0.033, HELD_MIN = 15;
+function render(t) {
+  const cam = camAt(t), k = pw / cam.w, hh = cam.w * ph / pw;
+  for (const p of panels) {
+    p.svg.setAttribute("viewBox", `${cam.x - cam.w / 2} ${cam.y - hh / 2} ${cam.w} ${hh}`);
+    for (const r of p.cards) {
+      const c = r.c, sx = (c.x - cam.x) * k + pw / 2, sy = (c.y - cam.y) * k + ph / 2, sw = c.ww * k, sh = c.wh * k, s = sw / cw;
+      const vis = sx + sw / 2 > -20 && sx - sw / 2 < pw + 20 && sy + sh / 2 > -20 && sy - sh / 2 < ph + 20;
+      r.card.style.visibility = vis ? "visible" : "hidden";
+      if (r.sign) r.sign.style.visibility = vis ? "visible" : "hidden";
+      if (!vis) continue;
+      r.card.style.transform = `translate(${(sx - sw / 2).toFixed(2)}px, ${(sy - sh / 2).toFixed(2)}px) scale(${s.toFixed(5)})`;
+      const eyePx = EYE * cw * s, titlePx = TITLE * cw * s, bodyPx = BODY * cw * s;
+      if (p.a.key === "now") {
+        const glance = 1 - smoothstep(9.4, 10, bodyPx), read = smoothstep(10, 10.8, bodyPx), titleText = smoothstep(7.5, 10.5, c.gt * cw * s);
+        setOp(r, "read", r.read, read); setOp(r, "glance", r.glance, glance);
+        setOp(r, "gt", r.gText, titleText); setOp(r, "gb", r.gBar, 1 - titleText);
+        continue;
+      }
+      dissolve(r, "e", r.e, eyePx, 6, 8);
+      dissolve(r, "b", r.b, bodyPx, 6.5, 8.5);
+      if (p.a.key === "held") {
+        const g = clamp(HELD_MIN / titlePx, 1, r.G);
+        r.t.style.transform = `scale(${g.toFixed(4)})`;
+        r.b.style.transform = `translateY(${((g - 1) * r.titleH).toFixed(2)}px)`;
+        dissolve(r, "t", r.t, titlePx * g, 5.5, 7.5);
+      } else dissolve(r, "t", r.t, titlePx, 5.5, 7.5);
+      if (r.sign) {
+        setOp(r, "sign", r.sign, 1 - smoothstep(6.5, 8.5, titlePx));
+        r.sign.style.transform = `translate(${(sx - sw / 2).toFixed(1)}px, ${(sy - sh / 2 - 4).toFixed(1)}px) translateY(-100%)`;
+      }
+    }
+  }
+}
+
+// Transport
+const playBtn = document.getElementById("play"), slowBtn = document.getElementById("slow"), scrub = document.getElementById("scrub"), clock = document.getElementById("clock");
+let playing = !matchMedia("(prefers-reduced-motion: reduce)").matches, speed = 1, t = 0, last = performance.now();
+function syncButtons() { playBtn.textContent = playing ? "Pause" : "Play"; playBtn.setAttribute("aria-pressed", String(playing)); slowBtn.setAttribute("aria-pressed", String(speed < 1)); }
+playBtn.onclick = () => { playing = !playing; syncButtons(); };
+slowBtn.onclick = () => { speed = speed < 1 ? 1 : 0.5; syncButtons(); };
+scrub.addEventListener("input", () => { playing = false; syncButtons(); t = scrub.value / 1000 * total; });
+function loop(nowMs) {
+  const dt = Math.min(0.1, (nowMs - last) / 1000); last = nowMs;
+  if (playing) t = (t + dt * speed) % total;
+  render(t);
+  if (playing) scrub.value = String(Math.round(t / total * 1000));
+  clock.textContent = `${t.toFixed(1)}s`;
+  requestAnimationFrame(loop);
+}
+window.addEventListener("resize", () => { measure(); render(t); });
+window.lab = { seek(x) { playing = false; syncButtons(); t = x; render(t); }, get total() { return total; } };
+document.fonts.ready.then(() => { measure(); syncButtons(); requestAnimationFrame(loop); });
+})();
+</script>
+</body>
+</html>

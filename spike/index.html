@@ -216,6 +216,8 @@ button .k { color: var(--ink-2); margin-right: 6px; }
 #help dt { font: 500 12px/1.6 var(--font-mono); color: var(--route); white-space: nowrap; }
 #help dd { margin: 0; color: var(--ink-2); }
 #help p { margin: 12px 0 0; color: var(--ink-2); font-size: 12px; }
+.help-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+#btn-start { border-color: var(--route); color: var(--route); padding: 10px 14px; }
 .capture #hud .chips, .capture #hud .nav, .capture #status, .capture #scrub, .capture #help { display: none !important; }
 
 /* Strip map: small screens read the route as one scrolling column, the way old
@@ -287,6 +289,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <button id="btn-tour" type="button" title="Play the route as a video (V)"><span class="k">V</span><span>Play tour</span></button>
         <button id="btn-motion" type="button" title="Motion profile (R)"><span class="k">R</span><span>Cinematic</span></button>
         <button id="btn-skin" type="button" title="Skin (T)"><span class="k">T</span><span>Sectional</span></button>
+        <button id="btn-bend" type="button" title="Curves (C)"><span class="k">C</span><span>Gentle curves</span></button>
         <button id="btn-help" type="button" title="Keys (?)">?</button>
       </div>
     </div>
@@ -307,8 +310,8 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <button id="btn-next" type="button" aria-label="Next stop">→</button>
       </div>
     </div>
-    <div id="help" class="pill" hidden>
-      <h3>Keys</h3>
+    <div id="help" class="pill">
+      <h3>Legend</h3>
       <dl>
         <dt>→ / space</dt><dd>Next stop. When you have wandered off the route, it rejoins where you left.</dd>
         <dt>←</dt><dd>Previous stop, or back to where you left the route.</dd>
@@ -318,9 +321,11 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <dt>V</dt><dd>Play the route as a video, with a scrubber.</dd>
         <dt>R</dt><dd>Motion: cinematic or remote (for screen share).</dd>
         <dt>T</dt><dd>Skin: Sectional or Boardroom.</dd>
+        <dt>C</dt><dd>Curves: gentle, bold, or winding.</dd>
         <dt>Drag, wheel, pinch</dt><dd>Explore freely. Click any station to fly there.</dd>
       </dl>
-      <p>This prototype tests the motion. The deck source is the Markdown at the bottom of this file. On a narrow screen the route becomes a scrolling strip.</p>
+      <p>Keys work once this page has keyboard focus, so click anywhere first. Press ? to bring this legend back. On a narrow screen the route becomes a scrolling strip.</p>
+      <div class="help-actions"><button id="btn-start" type="button">Start the tour →</button></div>
     </div>
   </div>
 </div>
@@ -532,6 +537,12 @@ function parseDeck(src) {
 // trunk. Each station is placed from the previous one along the current heading,
 // then slid forward until it touches nothing, so curves can never collide.
 const BASE_W = 1600, BASE_H = 1000;
+// How hard the trails bend. Gentle is the default; the others are for comparison.
+const BENDS = {
+  gentle: { label: "Gentle", trunkAmp: 0.14, trunkFreq: 1.9, branchStart: 72, branchTurn: 19, branchMin: 8, subStart: 45, subTurn: 13, ctrl: 1 / 3 },
+  bold: { label: "Bold", trunkAmp: 0.3, trunkFreq: 1.7, branchStart: 88, branchTurn: 27, branchMin: 4, subStart: 70, subTurn: 22, ctrl: 0.42 },
+  winding: { label: "Winding", trunkAmp: 0.48, trunkFreq: 1.35, branchStart: 100, branchTurn: 31, branchMin: 0, subStart: 88, subTurn: 27, ctrl: 0.5 },
+};
 const LEVEL_SCALE = { 1: 1, 2: 1, 3: 0.62, 4: 0.42, 5: 0.3, 6: 0.22 };
 function overlaps(a, b, g) { return a.x < b.x + b.w + g && a.x + a.w + g > b.x && a.y < b.y + b.h + g && a.y + a.h + g > b.y; }
 function sepDelta(a, b, u, g) {
@@ -542,7 +553,7 @@ function sepDelta(a, b, u, g) {
   if (u.y < -1e-6) best = Math.min(best, (b.y - g - (a.y + a.h)) / u.y);
   return best;
 }
-function layoutDeck(deck) {
+function layoutDeck(deck, B) {
   const { root, nodes } = deck;
   for (const n of nodes) {
     n.s = LEVEL_SCALE[n.level] ?? 0.2; n.ww = BASE_W * n.s; n.wh = BASE_H * n.s;
@@ -551,11 +562,11 @@ function layoutDeck(deck) {
   root.heading = 0;
   let side = 1;
   function headingsFor(n) {
-    if (n.level === 1) return n.seq.map((_, i) => 0.14 * Math.sin(i * 1.9 + 0.5));
+    if (n.level === 1) return n.seq.map((_, i) => B.trunkAmp * Math.sin(i * B.trunkFreq + 0.5));
     if (n.level === 2) { side = -side; n.side = side; } else n.side = n.parent.side;
     const s = n.side, h = n.heading;
-    if (n.level === 2) return n.seq.map((_, i) => { const a = h + s * (72 - 19 * i) * DEG; return s > 0 ? Math.max(a, h + 8 * DEG) : Math.min(a, h - 8 * DEG); });
-    return n.seq.map((_, i) => { const a = h - s * 45 * DEG + s * 13 * i * DEG; return s > 0 ? Math.min(a, h) : Math.max(a, h); });
+    if (n.level === 2) return n.seq.map((_, i) => { const a = h + s * (B.branchStart - B.branchTurn * i) * DEG; return s > 0 ? Math.max(a, h + B.branchMin * DEG) : Math.min(a, h - B.branchMin * DEG); });
+    return n.seq.map((_, i) => { const a = h - s * B.subStart * DEG + s * B.subTurn * i * DEG; return s > 0 ? Math.min(a, h) : Math.max(a, h); });
   }
   function shape(n) {
     const rects = [{ x: -n.ww / 2, y: -n.wh / 2, w: n.ww, h: n.wh }];
@@ -597,7 +608,7 @@ function layoutDeck(deck) {
     n.seq.forEach((c, k) => {
       const h0 = k === 0 ? hs[0] : (hs[k - 1] + hs[k]) / 2, h1 = k === hs.length - 1 ? hs[k] : (hs[k] + hs[k + 1]) / 2;
       const a = { x: prev.x, y: prev.y }, b = { x: c.x, y: c.y };
-      const d = Math.hypot(b.x - a.x, b.y - a.y) / 3;
+      const d = Math.hypot(b.x - a.x, b.y - a.y) * B.ctrl;
       const p1 = { x: a.x + Math.cos(h0) * d, y: a.y + Math.sin(h0) * d }, p2 = { x: b.x - Math.cos(h1) * d, y: b.y - Math.sin(h1) * d };
       const pts = []; let len = 0;
       for (let i = 0; i <= 48; i++) {
@@ -688,9 +699,12 @@ const params = new URLSearchParams(location.search);
 const CAPTURE = params.has("capture");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const deck = parseDeck(document.getElementById("deck").textContent);
-layoutDeck(deck);
-const terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
-const { root, nodes, edges } = deck;
+const bendOrder = Object.keys(BENDS);
+let bend = BENDS[params.get("bend")] ? params.get("bend") : BENDS[location.hash.slice(1)] ? location.hash.slice(1) : "gentle";
+layoutDeck(deck, BENDS[bend]);
+let terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
+const { root, nodes } = deck;
+let edges = deck.edges;
 const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
 
 const stage = document.getElementById("stage"), canvas = document.getElementById("ground"), ctx = canvas.getContext("2d");
@@ -1178,7 +1192,7 @@ function updateHud() {
   else if (s.kind === "node" && s.node !== root) line = `<span class="now">Stop ${pad2(s.node.stop)}</span> / ${pad2(stations.length)}`;
   else line = `<span class="now">${stopLabel(s)}</span>`;
   const ds = excursion ? [] : availableDetours(currentNode());
-  const hint = introHint ? `<div class="hint">Click the map, then press → to travel. Press ? for keys.</div>` : "";
+  const hint = introHint ? `<div class="hint">Press → to travel, ? for the legend.</div>` : "";
   statusEl.innerHTML = `<div>${line}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].title)}</div>` : ""}${hint}`;
 }
 
@@ -1304,6 +1318,7 @@ function applyMode() {
   mapOpen = false; docEl.classList.remove("map-open");
   if (stripMode) {
     if (mode === "tour") exitTour();
+    hideHelp();
     buildStrip();
     requestAnimationFrame(() => { drawRails(); onStripScroll(); });
   } else {
@@ -1318,12 +1333,13 @@ const keyMap = {
   ArrowRight: next, " ": next, PageDown: next, ArrowLeft: prev, PageUp: prev,
   ArrowDown: dive, ArrowUp: surface, m: showMap, M: showMap, Escape: () => (mode === "tour" ? exitTour() : showMap()),
   Home: () => presenting() && goStop(0), End: () => presenting() && goStop(route.length - 1),
-  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, v: toggleTour, V: toggleTour, "?": toggleHelp,
+  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, c: cycleBend, C: cycleBend, v: toggleTour, V: toggleTour, "?": toggleHelp,
 };
 window.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (stripMode && !mapOpen && !["t", "T", "?"].includes(e.key)) return;  // let the strip scroll natively
+  if (stripMode && !mapOpen && !["t", "T", "c", "C", "?"].includes(e.key)) return;  // let the strip scroll natively
   if (mode === "tour" && e.key === " ") { e.preventDefault(); togglePlay(); return; }
+  if (e.key !== "?") hideHelp();
   const f = keyMap[e.key];
   if (f) { e.preventDefault(); f(); }
 });
@@ -1338,7 +1354,28 @@ function toggleSkin() {
   readTokens(); dirty = true;
 }
 function toggleTour() { if (stripMode) return; if (mode === "tour") exitTour(); else if (mode === "live") enterTour(); }
-function toggleHelp() { const h = document.getElementById("help"); h.hidden = !h.hidden; }
+const helpEl = document.getElementById("help");
+function toggleHelp() { helpEl.hidden = !helpEl.hidden; }
+function hideHelp() { if (helpEl.hidden) return; helpEl.hidden = true; document.getElementById("btn-start").textContent = "Close"; }
+document.getElementById("btn-start").onclick = () => {
+  const first = document.getElementById("btn-start").textContent !== "Close";
+  hideHelp(); stage.focus({ preventScroll: true });
+  if (first && ri === 0) next();
+};
+// Re-lay the map with a different bend, keeping where you are and what you've walked.
+function cycleBend() {
+  if (mode === "tour") exitTour();
+  const t = now(), { lit } = live.litAt(t), target = currentTarget();
+  bend = bendOrder[(bendOrder.indexOf(bend) + 1) % bendOrder.length];
+  document.querySelector("#btn-bend span:last-child").textContent = `${BENDS[bend].label} curves`;
+  layoutDeck(deck, BENDS[bend]); edges = deck.edges;
+  terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
+  const walked = [...lit].filter(([, v]) => v.f >= 1).map(([id]) => ({ id, len: byId[id].edge.len, rev: false }));
+  const cam = camForStop(target);
+  live = new Timeline(cam, target);
+  Object.assign(live.segs[0], { t0: t - 1, edges: walked, total: walked.reduce((a, e) => a + e.len, 0) });
+  dirty = true; updateHud();
+}
 function togglePlay() {
   if (!tour) return;
   if (tour.playing) { tourTime(); tour.playing = false; }
@@ -1351,6 +1388,7 @@ document.getElementById("btn-map").onclick = () => showMap();
 document.getElementById("btn-back").onclick = () => closeMap();
 document.getElementById("btn-motion").onclick = toggleMotion;
 document.getElementById("btn-skin").onclick = toggleSkin;
+document.getElementById("btn-bend").onclick = cycleBend;
 document.getElementById("btn-tour").onclick = toggleTour;
 document.getElementById("btn-help").onclick = toggleHelp;
 document.getElementById("btn-play").onclick = togglePlay;
@@ -1362,6 +1400,7 @@ let drag = null;
 function camNow() { const c = mode === "live" ? live.camAt(now()) : tour.tl.camAt(tourTime()); delete c.fade; return c; }
 stage.addEventListener("pointerdown", e => {
   if (e.target.closest("#hud button, #hud input, #minimap, #help")) return;
+  hideHelp();
   if (mode !== "live") return;
   stage.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1458,6 +1497,7 @@ window.addEventListener("resize", () => {
 measure();
 readTokens();
 live = new Timeline(camForStop(route[0]), route[0]);
+document.querySelector("#btn-bend span:last-child").textContent = `${BENDS[bend].label} curves`;
 applyMode();
 updateHud();
 if (CAPTURE) {

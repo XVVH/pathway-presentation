@@ -51,6 +51,21 @@ screen:
 The layers hand over in sequence, never overlapping, so a card never shows two titles.
 There are no separate floating map labels: the card is its own label.
 
+**Open: the swap breaks reading.** People read while the camera moves, so a title that
+jumps in size and rewraps mid-zoom pulls their eye off the line. `spike/text-zoom-lab.html`
+runs four candidates side by side on the same camera loop:
+
+1. **Now**: swap to the glance card (the baseline above).
+2. **Greek in place**: nothing ever resizes or moves. Each line dissolves into a bar the
+   exact shape of itself, measured from the real line boxes, when it gets too small to read.
+3. **Held title**: the title keeps its line breaks and holds a readable size, like a
+   map label, while the card grows or shrinks around it. Body lines dissolve in place.
+4. **Signpost**: the card only scales and dissolves in place; a fixed-size sign on its
+   top edge names it only while its own title is unreadable.
+
+Leaning toward 3: it keeps the map legible without ever changing a line break, and the
+title appears to wait while the card catches up to it.
+
 ### 2. Motion grammar
 
 In means detail. Out means context. Across means next. Nothing rotates. Audiences learn
@@ -220,7 +235,13 @@ includes:
 - the strip map for small screens
 - a capture tool that renders the route to MP4
 
-Add `?view=strip` or `?view=present` to the URL to force either layout.
+Add `?view=strip` or `?view=present` to the URL to force either layout, and
+`?bend=bold` or `?bend=winding` to start with stronger curves.
+
+The legend opens on first load. Inside a frame, such as the artifact viewer, keys only
+reach the page after a click, and the legend's Start button provides that click.
+
+`spike/text-zoom-lab.html` compares the zoom-text candidates described in 1a.
 
 Run it by opening `spike/index.html` in a browser. Keys: → / ← travel, ↓ detour,
 ↑ pull back, M map, V tour, R remote motion, T skin, ? help.
@@ -261,7 +282,8 @@ From the first review:
 ## Open questions
 
 1. Card shape: fixed 16:10 placards, or sized to their content?
-2. How much should branches curve? The bend is a per-skin setting waiting to happen.
+2. How much should branches curve? The prototype has three presets (gentle, bold,
+   winding; key C). The bend should probably become a skin setting.
 3. Route syntax for named routes: a list in frontmatter, or a sidecar `*.route` file?
 4. Takeaway syntax: a `> takeaway:` line, or the first sentence of each trunk stop?
 5. Follow link: is a relay acceptable for work talks, or personal/consultancy only?
