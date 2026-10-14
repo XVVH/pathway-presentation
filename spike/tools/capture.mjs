@@ -34,6 +34,7 @@ const scale = Number(args.scale || 1.5);
 
 const query = new URLSearchParams({ capture: "1" });
 if (args.bend) query.set("bend", args.bend);
+if (args.cards) query.set("cards", args.cards);
 if (args.skin) query.set("skin", args.skin);
 if (args.motion) query.set("motion", args.motion);
 

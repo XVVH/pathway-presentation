@@ -194,10 +194,40 @@ Fonts ship in `media/fonts/`. Speaker notes are never in the build unless asked 
 ### 10. Skins are tokens for color, type, and motion
 
 A skin is a CSS file of custom properties, with light and dark values. It sets palette
-and typefaces, plus motion: flight speed, maximum duration, how high flights climb, and
-the terrain style. A corporate skin moves briskly and flat; a personal one can take
-its time. The prototype ships two: **Sectional** (an aeronautical chart, with the route
-drawn as the magenta line) and **Boardroom**.
+and typefaces, plus motion: flight speed, maximum duration, how high flights climb, the
+terrain style, and how hard the trails bend (`--bend`: gentle, bold or winding). A
+corporate skin moves briskly over gently curving trails; a personal one can take its
+time on winding ones. The prototype ships two: **Sectional** (an aeronautical chart,
+with the route drawn as the magenta line, bold curves) and **Boardroom** (gentle).
+
+A skin changes the map's geography as well as its look: new curves, and new card
+heights, since its fonts set differently. Switching skins re-lays the map.
+
+### 10a. Cards fit their content, within a system
+
+- **Width is fixed per level** (trunk, branch, deeper). That keeps line length, the
+  trail rhythm, and the camera's zoom at each stop consistent.
+- **Height fits the content**, snapped to sixteenths of the width, between a floor (a
+  one-line stop is a signpost, not a sliver) and a cap of 0.8 of the width.
+- **More content than the cap is a lint error**, not a scrollbar: "this stop holds too
+  much; branch it." The format's answer to a long slide is depth.
+- **Heights are measured once, at a fixed reference width, never from the screen.**
+  Type is sized relative to the card, so the measurement holds at any resolution. The
+  map is then the same on a laptop, a projector, a phone, and in every rendered video.
+  The build bakes the heights (and image and video dimensions) into the output, so the
+  runtime never measures and nothing shifts while loading.
+
+For video this helps more than it hurts:
+
+- The camera frames a stop by its width, so each level has the same zoom throughout a
+  video. A short card simply shows more landscape around it.
+- Only a card at the cap can force the camera to pull back slightly, and the linter
+  keeps that rare.
+- Vertical 9:16 renders work as is: cards fill most of the frame width, and the trail
+  runs above and below them.
+- One more option, since the layout is computed: a vertical render could run the trunk
+  south instead of east, so the final pull-back fills a portrait frame. It would be the
+  same map in a different projection, like the strip map.
 
 ### 11. Built for agents
 
@@ -234,7 +264,7 @@ includes:
 - a capture tool that renders the route to MP4
 
 Add `?view=strip` or `?view=present` to the URL to force either layout, and
-`?bend=bold` or `?bend=winding` to start with stronger curves.
+`?bend=` to override the skin's curves, and `?cards=fixed` for uniform 16:10 cards.
 
 The legend opens on first load. Inside a frame, such as the artifact viewer, keys only
 reach the page after a click, and the legend's Start button provides that click.
@@ -279,14 +309,12 @@ From the first review:
 
 ## Open questions
 
-1. Card shape: fixed 16:10 placards, or sized to their content?
-2. How much should branches curve? The prototype has three presets (gentle, bold,
-   winding; key C). The bend should probably become a skin setting.
-3. Route syntax for named routes: a list in frontmatter, or a sidecar `*.route` file?
-4. Takeaway syntax: a `> takeaway:` line, or the first sentence of each trunk stop?
-5. Follow link: is a relay acceptable for work talks, or personal/consultancy only?
-6. Can Node run on the work machine, or does the browser-hosted compiler come first?
-7. How far down does semantic zoom go: should diagrams have stations inside them
+1. Should vertical video renders run the trunk south (see 10a)?
+2. Route syntax for named routes: a list in frontmatter, or a sidecar `*.route` file?
+3. Takeaway syntax: a `> takeaway:` line, or the first sentence of each trunk stop?
+4. Follow link: is a relay acceptable for work talks, or personal/consultancy only?
+5. Can Node run on the work machine, or does the browser-hosted compiler come first?
+6. How far down does semantic zoom go: should diagrams have stations inside them
    ("zoom into the API Gateway box")?
 
 ## Build plan

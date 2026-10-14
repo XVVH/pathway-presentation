@@ -40,6 +40,7 @@
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --display-case: uppercase;
   --terrain: contours;
+  --bend: bold;
   --flight-speed: 1;
   --flight-max: 3.6;
   --flight-rho: 1.414;
@@ -70,7 +71,7 @@
   --font-display: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-body: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --display-case: none;
-  --terrain: dots; --flight-speed: 1.25; --flight-max: 2.4; --flight-rho: 1.15;
+  --terrain: dots; --bend: gentle; --flight-speed: 1.25; --flight-max: 2.4; --flight-rho: 1.15;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-skin="boardroom"]:not([data-theme="light"]) {
@@ -99,7 +100,7 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
    text gets too small to read, it dissolves into a bar the exact shape of itself
    (greeking), and resolves back into words as you come closer. */
 .card {
-  position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch);
+  position: absolute; left: 0; top: 0; width: var(--cw); height: calc(var(--cw) * var(--ratio, 0.625));
   transform-origin: 0 0; container-type: size; visibility: hidden;
   background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
   box-shadow: 0 18px 50px -24px var(--shadow), 0 2px 6px -2px var(--shadow);
@@ -117,6 +118,10 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
 .card.has-media:not(.wide-media) .read figure { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
 .card.wide-media figure { grid-row: 4; margin-top: 3cqw; }
 .bars .bg { position: absolute; inset: 0; }
+/* Offscreen box where cards are laid out at a fixed reference width to find their height. */
+.measure { position: absolute; left: -100000px; top: 0; width: 1280px; visibility: hidden; pointer-events: none; }
+.measure .card { position: static; width: 100%; height: auto; container-type: inline-size; box-shadow: none; }
+.measure .card .read { position: static; }
 .bars .bar { position: absolute; border-radius: 999px; background: var(--skeleton); }
 .bars .title .bar { background: var(--skeleton-strong); }
 .bars .bar.dot { background: var(--route); opacity: 0.45; }
@@ -156,7 +161,7 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
 figure { margin: 0; min-width: 0; }
 figure img, figure video { display: block; width: 100%; height: auto; border-radius: 0.8cqw; }
 figure video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--code-bg); }
-.card.wide-media figure img { max-height: 26cqh; object-fit: contain; }
+.card.wide-media figure img { max-height: 16cqw; object-fit: contain; }
 figcaption { margin-top: 0.8em; font: 1.6cqw/1.4 var(--font-mono); color: var(--ink-2); letter-spacing: 0.04em; }
 
 /* HUD */
@@ -220,7 +225,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
 .strip.map-open #strip { visibility: hidden; }
 .strip.map-open #btn-back { display: inline-block; }
 .strip.map-open .hud-bottom { display: flex; justify-content: center; }
-.strip.map-open #status, .strip.map-open .nav, .strip.map-open #minimap, .strip.map-open #btn-tour, .strip.map-open #btn-motion, .strip.map-open #btn-hover { display: none; }
+.strip.map-open #status, .strip.map-open .nav, .strip.map-open #minimap, .strip.map-open #btn-tour, .strip.map-open #btn-motion, .strip.map-open #btn-hover, .strip.map-open #btn-shape { display: none; }
 .s-bar {
   position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -281,7 +286,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <button id="btn-motion" type="button" title="Motion profile (R)"><span class="k">R</span><span>Cinematic</span></button>
         <button id="btn-skin" type="button" title="Skin (T)"><span class="k">T</span><span>Sectional</span></button>
         <button id="btn-hover" type="button" title="Hover (H)"><span class="k">H</span><span>Hover: path</span></button>
-        <button id="btn-bend" type="button" title="Curves (C)"><span class="k">C</span><span>Gentle curves</span></button>
+        <button id="btn-shape" type="button" title="Card shape (K)"><span class="k">K</span><span>Fitted cards</span></button>
         <button id="btn-help" type="button" title="Keys (?)">?</button>
       </div>
     </div>
@@ -313,7 +318,8 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <dt>V</dt><dd>Play the route as a video, with a scrubber.</dd>
         <dt>R</dt><dd>Motion: cinematic or remote (for screen share).</dd>
         <dt>T</dt><dd>Skin: Sectional or Boardroom.</dd>
-        <dt>C</dt><dd>Curves: gentle, bold, or winding.</dd>
+        <dt>K</dt><dd>Cards fitted to their content, or all one shape.</dd>
+        <dt>C</dt><dd>Try other curves. Each skin sets its own.</dd>
         <dt>H</dt><dd>Hover a station to light the trail there. H turns it off.</dd>
         <dt>Drag, wheel, pinch</dt><dd>Explore freely. Click any station to fly there.</dd>
       </dl>
@@ -529,7 +535,7 @@ function parseDeck(src) {
 // climbs out of a valley. Deeper detail starts forward and bends away from the
 // trunk. Each station is placed from the previous one along the current heading,
 // then slid forward until it touches nothing, so curves can never collide.
-const BASE_W = 1600, BASE_H = 1000;
+const BASE_W = 1600;
 // How hard the trails bend. Gentle is the default; the others are for comparison.
 const BENDS = {
   gentle: { label: "Gentle", trunkAmp: 0.14, trunkFreq: 1.9, branchStart: 72, branchTurn: 19, branchMin: 8, subStart: 45, subTurn: 13, ctrl: 1 / 3 },
@@ -549,7 +555,7 @@ function sepDelta(a, b, u, g) {
 function layoutDeck(deck, B) {
   const { root, nodes } = deck;
   for (const n of nodes) {
-    n.s = LEVEL_SCALE[n.level] ?? 0.2; n.ww = BASE_W * n.s; n.wh = BASE_H * n.s;
+    n.s = LEVEL_SCALE[n.level] ?? 0.2; n.ww = BASE_W * n.s; n.wh = n.ww * (n.ratio ?? 0.625);
     n.seq = [...n.children.filter(c => !c.detour), ...n.children.filter(c => c.detour)];
   }
   root.heading = 0;
@@ -693,7 +699,8 @@ const CAPTURE = params.has("capture");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const deck = parseDeck(document.getElementById("deck").textContent);
 const bendOrder = Object.keys(BENDS);
-let bend = BENDS[params.get("bend")] ? params.get("bend") : BENDS[location.hash.slice(1)] ? location.hash.slice(1) : "gentle";
+const bendOverride0 = BENDS[params.get("bend")] ? params.get("bend") : BENDS[location.hash.slice(1)] ? location.hash.slice(1) : null;
+let bend = bendOverride0 || "gentle", bendOverride = !!bendOverride0;
 layoutDeck(deck, BENDS[bend]);
 let terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
 const { root, nodes } = deck;
@@ -817,21 +824,51 @@ function measureLines() {
   }
 }
 let assetsReady = false, linesKey = "";
+
+// Card shape. "fitted" sizes each card's height to its content, measured once at a
+// fixed reference width and snapped to sixteenths of the width, between a floor and
+// a cap. "fixed" makes every card 16:10. Either way the shape never depends on the
+// screen, so the map is the same on every device and in every rendered video.
+const FIXED_RATIO = 0.625, RATIO_STEP = 1 / 16, RATIO_MIN = 0.375, RATIO_MAX = 0.8;
+let cardShape = params.get("cards") === "fixed" ? "fixed" : "fitted";
+function measureRatios() {
+  const box = document.createElement("div");
+  box.className = "measure";
+  document.body.appendChild(box);
+  for (const n of nodes) {
+    const clone = n.card.cloneNode(true);
+    clone.removeAttribute("style");
+    clone.querySelector(".bars")?.remove();
+    box.appendChild(clone);
+    const r = clone.offsetHeight / box.clientWidth;
+    n.fitRatio = clamp(Math.ceil(r / RATIO_STEP - 0.001) * RATIO_STEP, RATIO_MIN, RATIO_MAX);
+    n.tooLong = r > RATIO_MAX;
+  }
+  box.remove();
+  const long = nodes.filter(n => n.tooLong).map(n => n.title);
+  if (long.length) console.warn("Pathway: more content than one stop holds; consider a branch:", long);
+}
+function applyShape() {
+  for (const n of nodes) {
+    n.ratio = cardShape === "fitted" && n.fitRatio ? n.fitRatio : FIXED_RATIO;
+    n.card.style.setProperty("--ratio", n.ratio);
+  }
+}
 function ensureLines() {
   if (!stage.clientWidth) return;
-  const key = `${cw}|${docEl.dataset.skin || ""}|${assetsReady}`;
+  const key = `${cw}|${docEl.dataset.skin || ""}|${assetsReady}|${cardShape}`;
   if (key === linesKey) return;
   linesKey = key; measureLines();
 }
 
 // ---------------------------------------------------------------- viewport, framing
-let vw = 1, vh = 1, dpr = 1, cw = 1280, ch = 800, frame = { x: 0, y: 0, w: 1, h: 1 };
+let vw = 1, vh = 1, dpr = 1, cw = 1280, frame = { x: 0, y: 0, w: 1, h: 1 };
 function measure() {
   if (!stage.clientWidth) return;
   vw = stage.clientWidth; vh = stage.clientHeight; dpr = Math.min(window.devicePixelRatio || 1, 2);
   frame = { x: 0, y: 58, w: vw, h: Math.max(120, vh - 58 - 70) };
-  cw = Math.floor(Math.min(vw * 0.6, frame.h * 0.8 * 1.6)); ch = Math.round(cw / 1.6);
-  worldEl.style.setProperty("--cw", cw + "px"); worldEl.style.setProperty("--ch", ch + "px");
+  cw = Math.floor(Math.min(vw * (vw < vh ? 0.86 : 0.6), frame.h * 0.8 * 1.6));
+  worldEl.style.setProperty("--cw", cw + "px");
   canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
   mini.width = Math.round(184 * dpr); mini.height = Math.round(104 * dpr);
 }
@@ -839,7 +876,7 @@ function camFor(cx, cy, k) {
   const fx = frame.x + frame.w / 2, fy = frame.y + frame.h / 2;
   return { x: cx - (fx - vw / 2) / k, y: cy - (fy - vh / 2) / k, w: vw / k };
 }
-function fitNode(n) { return camFor(n.x, n.y, cw / n.ww); }
+function fitNode(n) { return camFor(n.x, n.y, Math.min(cw / n.ww, frame.h * 0.94 / n.wh)); }
 function fitBox(b, pad = 1.12) {
   const w = (b.x1 - b.x0) * pad, h = (b.y1 - b.y0) * pad;
   return camFor((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, Math.min(frame.w / w, frame.h / h));
@@ -852,7 +889,7 @@ function readTokens() {
   const cs = getComputedStyle(docEl), g = k => cs.getPropertyValue(k).trim();
   T = {
     ground: g("--ground"), contour: g("--contour"), contourMajor: g("--contour-major"), trail: g("--trail"), route: g("--route"),
-    ink: g("--ink"), ink2: g("--ink-2"), terrain: g("--terrain") || "contours",
+    ink: g("--ink"), ink2: g("--ink-2"), terrain: g("--terrain") || "contours", bend: g("--bend") || "gentle",
     speed: parseFloat(g("--flight-speed")) || 1, max: parseFloat(g("--flight-max")) || 3.6, rho: parseFloat(g("--flight-rho")) || Math.SQRT2,
   };
 }
@@ -1375,7 +1412,7 @@ const keyMap = {
   ArrowRight: next, " ": next, PageDown: next, ArrowLeft: prev, PageUp: prev,
   ArrowDown: dive, ArrowUp: surface, m: showMap, M: showMap, Escape: () => (mode === "tour" ? exitTour() : showMap()),
   Home: () => presenting() && goStop(0), End: () => presenting() && goStop(route.length - 1),
-  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, c: cycleBend, C: cycleBend, h: cycleHover, H: cycleHover, v: toggleTour, V: toggleTour, "?": toggleHelp,
+  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, c: cycleBend, C: cycleBend, k: toggleShape, K: toggleShape, h: cycleHover, H: cycleHover, v: toggleTour, V: toggleTour, "?": toggleHelp,
 };
 window.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1395,7 +1432,12 @@ function toggleSkin() {
   if (docEl.dataset.skin === "boardroom") delete docEl.dataset.skin; else docEl.dataset.skin = "boardroom";
   document.querySelector("#btn-skin span:last-child").textContent = docEl.dataset.skin === "boardroom" ? "Boardroom" : "Sectional";
   readTokens(); dirty = true;
-  document.fonts.ready.then(() => { linesKey = ""; dirty = true; });
+  // A skin brings its own fonts (so new card heights) and its own curves.
+  document.fonts.ready.then(() => {
+    measureRatios(); applyShape();
+    if (!bendOverride && BENDS[T.bend]) bend = T.bend;
+    relayout();
+  });
 }
 function toggleTour() { if (stripMode) return; if (mode === "tour") exitTour(); else if (mode === "live") enterTour(); }
 const helpEl = document.getElementById("help");
@@ -1406,19 +1448,26 @@ document.getElementById("btn-start").onclick = () => {
   hideHelp(); stage.focus({ preventScroll: true });
   if (first && ri === 0) next();
 };
-// Re-lay the map with a different bend, keeping where you are and what you've walked.
-function cycleBend() {
+// Re-lay the map (new bend, card shapes or fonts), keeping where you are and what you've walked.
+function relayout() {
   if (mode === "tour") exitTour();
   const t = now(), { lit } = live.litAt(t), target = currentTarget();
-  bend = bendOrder[(bendOrder.indexOf(bend) + 1) % bendOrder.length];
-  document.querySelector("#btn-bend span:last-child").textContent = `${BENDS[bend].label} curves`;
   layoutDeck(deck, BENDS[bend]); edges = deck.edges;
   terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
   const walked = [...lit].filter(([, v]) => v.f >= 1).map(([id]) => ({ id, len: byId[id].edge.len, rev: false }));
-  const cam = camForStop(target);
-  live = new Timeline(cam, target);
+  live = new Timeline(camForStop(target), target);
   Object.assign(live.segs[0], { t0: t - 1, edges: walked, total: walked.reduce((a, e) => a + e.len, 0) });
-  dirty = true; updateHud();
+  linesKey = ""; dirty = true; updateHud();
+}
+function cycleBend() {
+  bend = bendOrder[(bendOrder.indexOf(bend) + 1) % bendOrder.length];
+  bendOverride = true;
+  relayout();
+}
+function toggleShape() {
+  cardShape = cardShape === "fitted" ? "fixed" : "fitted";
+  document.querySelector("#btn-shape span:last-child").textContent = cardShape === "fitted" ? "Fitted cards" : "Fixed cards";
+  applyShape(); relayout();
 }
 function togglePlay() {
   if (!tour) return;
@@ -1432,7 +1481,7 @@ document.getElementById("btn-map").onclick = () => showMap();
 document.getElementById("btn-back").onclick = () => closeMap();
 document.getElementById("btn-motion").onclick = toggleMotion;
 document.getElementById("btn-skin").onclick = toggleSkin;
-document.getElementById("btn-bend").onclick = cycleBend;
+document.getElementById("btn-shape").onclick = toggleShape;
 document.getElementById("btn-hover").onclick = cycleHover;
 
 // Hover (mouse only). Pointing at a station lights the trail from where you are to
@@ -1563,25 +1612,32 @@ window.addEventListener("resize", () => {
 
 measure();
 readTokens();
+if (!bendOverride && BENDS[T.bend] && T.bend !== bend) { bend = T.bend; layoutDeck(deck, BENDS[bend]); edges = deck.edges; terrain = buildTerrain(deck, hash(deck.meta.title || "pathway")); }
 live = new Timeline(camForStop(route[0]), route[0]);
-document.querySelector("#btn-bend span:last-child").textContent = `${BENDS[bend].label} curves`;
+document.querySelector("#btn-shape span:last-child").textContent = cardShape === "fitted" ? "Fitted cards" : "Fixed cards";
 const assets = Promise.all([document.fonts.ready, ...[...worldEl.querySelectorAll("img")].map(img => img.decode().catch(() => {}))]);
-if (!CAPTURE) assets.then(() => { assetsReady = true; dirty = true; });
+if (!CAPTURE) assets.then(() => { assetsReady = true; measureRatios(); applyShape(); relayout(); });
 applyMode();
 updateHud();
 if (CAPTURE) {
   // Headless capture: precompute the tour and let the recorder step the clock.
   mode = "capture";
-  const tl = buildTour(params.get("motion") || "cinematic");
+  let tl = null;
   nodes.forEach(n => n.video && loadVideo(n.video));
   const vids = nodes.filter(n => n.video);
   const ready = Promise.all([
-    assets.then(() => { assetsReady = true; ensureLines(); }),
+    assets.then(() => {
+      assetsReady = true; measureRatios(); applyShape();
+      layoutDeck(deck, BENDS[bend]); edges = deck.edges; terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
+      ensureLines();
+      tl = buildTour(params.get("motion") || "cinematic");
+    }),
     ...vids.map(n => new Promise(res => { if (n.video.readyState >= 2) res(); else { n.video.addEventListener("loadeddata", res, { once: true }); n.video.addEventListener("error", res, { once: true }); } })),
   ]);
   window.pathway = {
-    ready, duration: tl.duration,
-    stops: tl.arrivals.map(a => ({ t: +a.t.toFixed(2), kind: a.stop.kind, id: a.stop.node?.id })),
+    ready,
+    get duration() { return tl.duration; },
+    get stops() { return tl.arrivals.map(a => ({ t: +a.t.toFixed(2), kind: a.stop.kind, id: a.stop.node?.id })); },
     async seek(t) {
       const { seg, settled, focusNode } = render(tl, t);
       if (seg.target !== lastHudTarget) { lastHudTarget = seg.target; tour = { tl, t }; mode = "tour"; updateHud(); mode = "capture"; }
