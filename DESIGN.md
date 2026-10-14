@@ -305,6 +305,20 @@ lets it share types with the runtime and run in two hosts: a Node CLI for agents
 CI, and a browser page you drop a folder onto. That second host matters if Node can't
 be installed on a locked-down work machine.
 
+### 12a. Leaving the route never moves your place
+
+You can leave the route three ways: take a detour (↓), click a stop, or drag and
+zoom. Whichever you do, your place on the route stays where you left it, → rejoins
+there, ← returns there, and the status line says so ("Off route · → rejoins at stop
+04"). What → does never depends on anything you can't see.
+
+An earlier version moved your place when you clicked a stop the route passes, and
+peeked otherwise. It confused in practice: whether a stop is on the route isn't
+visible on the map, and changes with the named route. Moving your place is now a
+deliberate act: C (or "Carry on from here" in the presenter window), offered only
+when the route passes the stop you're looking at. A link to a stop
+(`index.html#stop-id`) starts the talk there.
+
 ### 13. The presenter window follows the audience window
 
 Press P and the deck opens a second window of itself, in presenter mode: your notes

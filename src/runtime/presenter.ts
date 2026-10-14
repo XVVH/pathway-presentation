@@ -35,7 +35,8 @@ export function startPresenter(payload: Payload, token: string): void {
     <div class="notes md" id="p-notes"></div>
   </section>
   <aside>
-    <div class="panel"><h2>Next</h2><div class="next-title" id="p-next"></div><div class="next-sub" id="p-next-sub"></div></div>
+    <div class="panel"><h2>Next</h2><div class="next-title" id="p-next"></div><div class="next-sub" id="p-next-sub"></div>
+      <button type="button" data-cmd="continue" id="p-continue" class="carry" hidden title="Make this stop your place on the route (C)">Carry on from here instead (C)</button></div>
     <div class="panel"><h2>Detours from here</h2><div class="detours" id="p-detours"></div></div>
     <div class="panel"><h2>Drive the deck</h2><div class="keys">
       <button type="button" data-cmd="prev" aria-label="Previous">←</button>
@@ -52,7 +53,7 @@ export function startPresenter(payload: Payload, token: string): void {
   const els = {
     timer: byId("p-timer"), wall: byId("p-wall"), toggle: byId<HTMLButtonElement>("p-timer-toggle"), reset: byId<HTMLButtonElement>("p-timer-reset"),
     link: byId("p-link"), where: byId("p-where"), title: byId("p-title"), notes: byId("p-notes"),
-    next: byId("p-next"), nextSub: byId("p-next-sub"), detours: byId("p-detours"), blank: byId<HTMLButtonElement>("p-blank"),
+    next: byId("p-next"), nextSub: byId("p-next-sub"), carry: byId<HTMLButtonElement>("p-continue"), detours: byId("p-detours"), blank: byId<HTMLButtonElement>("p-blank"),
     map: byId<HTMLCanvasElement>("p-map"), route: document.getElementById("p-route") as HTMLSelectElement | null,
   };
   const minimap = new Minimap(els.map, map);
@@ -117,9 +118,11 @@ export function startPresenter(payload: Payload, token: string): void {
     const upcoming: Target | null = x && x.i + 1 < x.stops.length ? x.stops[x.i + 1] : state.ahead;
     const un = upcoming && upcoming.kind !== "map" ? map.byId.get(upcoming.id) : null;
     els.next.textContent = !upcoming ? "The end" : upcoming.kind === "stop" ? un?.stop.title ?? "" : capitalise(targetLabel(map, upcoming, named));
+    const rejoin = state.offRoute && !x ? "rejoins the route" : "";
     els.nextSub.textContent = upcoming?.kind === "stop" && un
-      ? [!named && un.stop.number !== null && `Stop ${pad2(un.stop.number)}`, un.detour && "Detour", un.parent && un.parent !== map.root && `in ${un.parent.stop.title}`, state.offRoute && !x && "rejoins the route"].filter(Boolean).join(" · ")
-      : "";
+      ? [!named && un.stop.number !== null && `Stop ${pad2(un.stop.number)}`, un.detour && "Detour", un.parent && un.parent !== map.root && `in ${un.parent.stop.title}`, rejoin].filter(Boolean).join(" · ")
+      : capitalise(rejoin);
+    els.carry.hidden = state.touring || !nav.canContinueHere();
     els.detours.innerHTML = state.detours.length
       ? state.detours.map(id => `<button type="button" data-detour="${esc(id)}">↓ ${esc(map.byId.get(id)?.stop.title ?? id)}</button>`).join("")
       : '<span class="none">None from here.</span>';
@@ -152,6 +155,7 @@ export function startPresenter(payload: Payload, token: string): void {
   const keys: Record<string, Command["cmd"]> = {
     ArrowRight: "next", " ": "next", PageDown: "next", Enter: "next", ArrowLeft: "prev", PageUp: "prev", Backspace: "prev",
     ArrowDown: "dive", ArrowUp: "surface", m: "map", M: "map", Escape: "map", b: "blank", B: "blank", ".": "blank",
+    c: "continue", C: "continue",
   };
   window.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest?.("select, input")) return;

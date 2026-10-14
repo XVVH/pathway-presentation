@@ -24,7 +24,7 @@ export interface DeckState {
 }
 
 export type Command =
-  | { cmd: "next" | "prev" | "dive" | "surface" | "map" | "blank" }
+  | { cmd: "next" | "prev" | "dive" | "surface" | "map" | "blank" | "continue" }
   | { cmd: "detour" | "visit"; id: string }
   | { cmd: "route"; name: string | null };
 
@@ -33,7 +33,7 @@ export type Message =
   | { pathway: 1; token: string; type: "state"; state: DeckState }
   | { pathway: 1; token: string; type: "cmd"; command: Command };
 
-const SIMPLE = new Set(["next", "prev", "dive", "surface", "map", "blank"]);
+const SIMPLE = new Set(["next", "prev", "dive", "surface", "map", "blank", "continue"]);
 
 /** Accepts only well-formed messages carrying this session's token. */
 export function readMessage(data: unknown, token: string | null): Message | null {

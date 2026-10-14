@@ -35,6 +35,8 @@ installed, say so rather than installing it unasked.
   since anyone with the folder can read them.
 - Keys: → next, ← back, ↓ detour, ↑ pull back, M map, P presenter, V tour, R remote
   (for screen share), B blank, D dark or light, F full screen, ? help.
+- Clicking a stop looks at it without losing your place: → rejoins the route where
+  you left. C carries on the talk from the stop you're looking at instead.
 
 ## Files
 

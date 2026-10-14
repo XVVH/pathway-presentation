@@ -123,14 +123,36 @@ export class Navigator {
     return (this.here = { kind: "map" });
   }
 
-  /** A click on a stop. On the route, the talk carries on from there; off it, → comes back. */
+  /**
+   * A click on a stop: always a look, never a change of place. → rejoins the
+   * route where you left it, wherever the stop is, so the key always does what
+   * the status line says. Clicking the stop you left from is rejoining.
+   */
   visit(id: string): Target | null {
     if (!this.map.byId.has(id)) return null;
-    const j = this.route.findIndex(s => s.kind === "stop" && s.id === id);
-    if (j >= 0) return this.goTo(j);
+    const t = stopTarget(id);
+    if (sameTarget(this.route[this.ri], t)) return this.goTo(this.ri);
     this.excursion = null;
     this.offRoute = true;
-    return (this.here = stopTarget(id));
+    return (this.here = t);
+  }
+
+  /** Moves your place on the route to this target. Null when the route doesn't pass it. */
+  continueFrom(t: Target): Target | null {
+    const j = this.route.findIndex(s => sameTarget(s, t));
+    return j >= 0 ? this.goTo(j) : null;
+  }
+
+  /** True when you've looked away to a target the route passes, so C can make it your place. */
+  canContinueHere(): boolean {
+    if (!this.offRoute) return false;
+    const t = this.current();
+    return this.route.some((s, j) => j !== this.ri && sameTarget(s, t));
+  }
+
+  /** C: carry on the talk from what you're looking at, instead of going back. */
+  continueHere(): Target | null {
+    return this.canContinueHere() ? this.continueFrom(this.current()) : null;
   }
 
   /** The camera was moved by hand. */

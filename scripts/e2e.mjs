@@ -97,6 +97,24 @@ await step("a detour from the presenter, then → rejoins", async () => {
   expect(/STOP 03/i.test(await status()), `deck status: ${await status()}`);
 });
 
+await step("a click is a look: → comes back, C carries on from there", async () => {
+  await deck.evaluate(() => { location.hash = "tilt"; });
+  await settle(deck);
+  expect(/OFF ROUTE/i.test(await status()), `deck status: ${await status()}`);
+  await deck.keyboard.press("ArrowRight");
+  await settle(deck);
+  expect(/LOOK BACK OVER DECKS ARE CORRIDORS/i.test(await status()), `didn't rejoin: ${await status()}`);
+  await deck.evaluate(() => { location.hash = "motion"; });
+  await settle(deck);
+  expect(/C CARRIES ON/i.test(await status()), `no carry-on hint: ${await status()}`);
+  await shot(deck, "04a-peek");
+  await shot(presenter, "04b-presenter-peek");
+  await presenter.locator("#p-continue").click();
+  await settle(deck);
+  expect(/STOP 09/i.test(await status()), `deck status: ${await status()}`);
+  expect(await presenter.locator("#p-continue").isHidden(), "carry-on button still shown");
+});
+
 await step("choosing a named route in the presenter", async () => {
   await presenter.selectOption("#p-route", "exec");
   await settle(deck);

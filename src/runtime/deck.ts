@@ -85,7 +85,11 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   let live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
   const restored = !capture && restorePosition();
   const deepLink = !capture && !restored && location.hash.length > 1 ? map.byId.get(decodeURIComponent(location.hash.slice(1))) : undefined;
-  if (deepLink) { nav.visit(deepLink.id); live = new Timeline(camForTarget(vp, map, nav.current()), nav.current()); }
+  if (deepLink) {
+    // A link to a stop starts the talk there when the route passes it.
+    if (!nav.continueFrom({ kind: "stop", id: deepLink.id })) nav.visit(deepLink.id);
+    live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
+  }
 
   function restorePosition(): boolean {
     try {
@@ -120,6 +124,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   const presenting = () => mode === "live" && !stripMode;
   const act = (f: () => Target | null) => () => { if (!presenting()) return; introHint = false; go(f()); };
   const next = act(() => nav.next()), prev = act(() => nav.prev()), dive = act(() => nav.dive()), surface = act(() => nav.surface());
+  const continueHere = act(() => nav.continueHere());
   function showMap(): void {
     if (mode !== "live") return;
     if (stripMode) { closeMap(null); return; }
@@ -206,7 +211,8 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     if (mode !== "live" || stripMode) return;
     const ds = nav.detours();
     const hint = notice ? `<div class="hint">${esc(notice)}</div>` : introHint ? '<div class="hint">Press → to travel, ? for the legend.</div>' : "";
-    hud.status.innerHTML = `<div>${positionLine(nav)}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].stop.title)}</div>` : ""}${hint}`;
+    const carry = nav.canContinueHere() ? '<div class="hint">C carries on the talk from here.</div>' : "";
+    hud.status.innerHTML = `<div>${positionLine(nav)}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].stop.title)}</div>` : ""}${carry}${hint}`;
   }
 
   let lastHudTarget: Target | null = null;
@@ -340,6 +346,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       case "surface": surface(); break;
       case "map": showMap(); break;
       case "blank": setBlank(!blank); break;
+      case "continue": continueHere(); break;
       case "detour": if (presenting()) go(nav.takeDetour(c.id)); break;
       case "visit": { const n = map.byId.get(c.id); if (n) visit(n); break; }
       case "route": if (presenting()) { const t = nav.useRoute(c.name); if (t) go(t); else { updateHud(); savePosition(); link.send(); } } break;
@@ -392,6 +399,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     h: () => { hoverOn = !hoverOn; hoverNode = null; dirty = true; }, H: () => { hoverOn = !hoverOn; hoverNode = null; dirty = true; },
     b: () => setBlank(!blank), B: () => setBlank(!blank), ".": () => setBlank(!blank),
     d: toggleTheme, D: toggleTheme, f: toggleFullscreen, F: toggleFullscreen, "?": toggleHelp,
+    c: continueHere, C: continueHere,
   };
   window.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey || mode === "capture") return;

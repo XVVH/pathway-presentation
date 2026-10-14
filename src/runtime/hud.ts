@@ -9,6 +9,7 @@ import type { Navigator } from "./navigator.ts";
 export const KEYS: [string, string][] = [
   ["→ / space", "Next stop. Off the route, it rejoins where you left."],
   ["←", "Previous stop, or back to where you left the route."],
+  ["C", "Carry on the talk from the stop you're looking at, instead of going back."],
   ["↓", "Take the detour offered here."],
   ["↑", "Pull back to see the branch you're on."],
   ["M / Esc", "The whole map."],
@@ -18,7 +19,7 @@ export const KEYS: [string, string][] = [
   ["B", "Blank the screen. Any key brings it back."],
   ["D", "Dark or light."],
   ["F", "Full screen."],
-  ["Drag, wheel, pinch", "Explore freely. Click any stop to go there."],
+  ["Drag, wheel, pinch", "Explore freely. Click any stop to look at it; → comes back."],
 ];
 
 export interface Hud {

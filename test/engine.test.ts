@@ -194,22 +194,53 @@ test("navigator: →, detours, ↑ and rejoining", () => {
   assert.deepEqual(keys.slice(-1), ["^a"]);
 });
 
-test("navigator: clicking a stop on the route carries on from there; off the route, → comes back", () => {
+test("navigator: a click is a look; → comes back wherever the stop is", () => {
   const map = world();
   const nav = new Navigator(map, new Map([[null, DEFAULT]]));
+  nav.next(); nav.next(); // the title, then a
+  for (const id of ["b1", "c1", "a2x", "title"]) {
+    nav.visit(id);
+    assert.equal(nav.offRoute, true, id);
+  }
+  assert.deepEqual(nav.next(), { kind: "stop", id: "a1" }, "rejoins after a");
+  nav.visit("d");
+  assert.deepEqual(nav.prev(), { kind: "stop", id: "a1" }, "← goes back to where you left");
+  nav.visit("d");
+  assert.deepEqual(nav.visit("a1"), { kind: "stop", id: "a1" });
+  assert.equal(nav.offRoute, false, "clicking the stop you left from is rejoining");
+});
+
+test("navigator: C carries on from a stop the route passes, and only then", () => {
+  const map = world();
+  const nav = new Navigator(map, new Map([[null, DEFAULT]]));
+  nav.next(); nav.next();
+  assert.equal(nav.canContinueHere(), false, "on the route already");
   nav.visit("b1");
+  assert.equal(nav.canContinueHere(), true);
+  assert.deepEqual(nav.continueHere(), { kind: "stop", id: "b1" });
   assert.equal(nav.offRoute, false);
   assert.deepEqual(nav.next(), { kind: "lookback", id: "b" });
-  nav.visit("c1");
-  assert.equal(nav.offRoute, true);
+  nav.visit("c1"); // under a detour: the route doesn't pass it
+  assert.equal(nav.canContinueHere(), false);
+  assert.equal(nav.continueHere(), null);
   assert.deepEqual(nav.next(), { kind: "stop", id: "d" });
+  // A pull-back the route makes is a place you can carry on from too...
+  nav.visit("b1");
+  nav.surface();
+  assert.deepEqual(nav.current(), { kind: "lookback", id: "b" });
+  assert.equal(nav.canContinueHere(), true);
+  // ...but not one it doesn't.
+  nav.visit("a2x");
+  nav.surface();
+  assert.deepEqual(nav.current(), { kind: "lookback", id: "a2" });
+  assert.equal(nav.canContinueHere(), false);
 });
 
 test("navigator: switching routes keeps your place when it can", () => {
   const map = world();
   const exec: Target[] = [{ kind: "map" }, { kind: "stop", id: "title" }, { kind: "stop", id: "b" }, { kind: "stop", id: "d" }, { kind: "map", final: true }];
   const nav = new Navigator(map, new Map([[null, DEFAULT], ["exec", exec]]));
-  nav.visit("b");
+  nav.continueFrom({ kind: "stop", id: "b" });
   assert.equal(nav.useRoute("exec"), null);
   assert.deepEqual(nav.next(), { kind: "stop", id: "d" });
   assert.deepEqual(nav.stations(), ["b", "d"]);

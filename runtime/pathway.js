@@ -729,6 +729,7 @@
   var KEYS = [
     ["→ / space", "Next stop. Off the route, it rejoins where you left."],
     ["←", "Previous stop, or back to where you left the route."],
+    ["C", "Carry on the talk from the stop you're looking at, instead of going back."],
     ["↓", "Take the detour offered here."],
     ["↑", "Pull back to see the branch you're on."],
     ["M / Esc", "The whole map."],
@@ -738,7 +739,7 @@
     ["B", "Blank the screen. Any key brings it back."],
     ["D", "Dark or light."],
     ["F", "Full screen."],
-    ["Drag, wheel, pinch", "Explore freely. Click any stop to go there."]
+    ["Drag, wheel, pinch", "Explore freely. Click any stop to look at it; → comes back."]
   ];
   function buildHud(title) {
     return `
@@ -940,14 +941,33 @@
       this.offRoute = this.ri !== 0 && !(at.kind === "map" && at.final);
       return this.here = { kind: "map" };
     }
-    /** A click on a stop. On the route, the talk carries on from there; off it, → comes back. */
+    /**
+     * A click on a stop: always a look, never a change of place. → rejoins the
+     * route where you left it, wherever the stop is, so the key always does what
+     * the status line says. Clicking the stop you left from is rejoining.
+     */
     visit(id) {
       if (!this.map.byId.has(id)) return null;
-      const j = this.route.findIndex((s) => s.kind === "stop" && s.id === id);
-      if (j >= 0) return this.goTo(j);
+      const t = stopTarget(id);
+      if (sameTarget(this.route[this.ri], t)) return this.goTo(this.ri);
       this.excursion = null;
       this.offRoute = true;
-      return this.here = stopTarget(id);
+      return this.here = t;
+    }
+    /** Moves your place on the route to this target. Null when the route doesn't pass it. */
+    continueFrom(t) {
+      const j = this.route.findIndex((s) => sameTarget(s, t));
+      return j >= 0 ? this.goTo(j) : null;
+    }
+    /** True when you've looked away to a target the route passes, so C can make it your place. */
+    canContinueHere() {
+      if (!this.offRoute) return false;
+      const t = this.current();
+      return this.route.some((s, j) => j !== this.ri && sameTarget(s, t));
+    }
+    /** C: carry on the talk from what you're looking at, instead of going back. */
+    continueHere() {
+      return this.canContinueHere() ? this.continueFrom(this.current()) : null;
     }
     /** The camera was moved by hand. */
     manual() {
@@ -1118,7 +1138,7 @@
   };
 
   // src/runtime/sync.ts
-  var SIMPLE = /* @__PURE__ */ new Set(["next", "prev", "dive", "surface", "map", "blank"]);
+  var SIMPLE = /* @__PURE__ */ new Set(["next", "prev", "dive", "surface", "map", "blank", "continue"]);
   function readMessage(data, token) {
     if (!token || typeof data !== "object" || data === null) return null;
     const m = data;
@@ -1363,7 +1383,7 @@
     const restored = !capture && restorePosition();
     const deepLink = !capture && !restored && location.hash.length > 1 ? map.byId.get(decodeURIComponent(location.hash.slice(1))) : void 0;
     if (deepLink) {
-      nav.visit(deepLink.id);
+      if (!nav.continueFrom({ kind: "stop", id: deepLink.id })) nav.visit(deepLink.id);
       live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
     }
     function restorePosition() {
@@ -1406,6 +1426,7 @@
       go(f());
     };
     const next = act(() => nav.next()), prev = act(() => nav.prev()), dive = act(() => nav.dive()), surface = act(() => nav.surface());
+    const continueHere = act(() => nav.continueHere());
     function showMap() {
       if (mode !== "live") return;
       if (stripMode) {
@@ -1508,7 +1529,8 @@
       if (mode !== "live" || stripMode) return;
       const ds = nav.detours();
       const hint = notice ? `<div class="hint">${esc(notice)}</div>` : introHint ? '<div class="hint">Press → to travel, ? for the legend.</div>' : "";
-      hud.status.innerHTML = `<div>${positionLine(nav)}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].stop.title)}</div>` : ""}${hint}`;
+      const carry = nav.canContinueHere() ? '<div class="hint">C carries on the talk from here.</div>' : "";
+      hud.status.innerHTML = `<div>${positionLine(nav)}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].stop.title)}</div>` : ""}${carry}${hint}`;
     }
     let lastHudTarget = null;
     let lastSettled = true;
@@ -1686,6 +1708,9 @@
         case "blank":
           setBlank(!blank);
           break;
+        case "continue":
+          continueHere();
+          break;
         case "detour":
           if (presenting()) go(nav.takeDetour(c.id));
           break;
@@ -1790,7 +1815,9 @@
       D: toggleTheme,
       f: toggleFullscreen,
       F: toggleFullscreen,
-      "?": toggleHelp
+      "?": toggleHelp,
+      c: continueHere,
+      C: continueHere
     };
     window.addEventListener("keydown", (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey || mode === "capture") return;
@@ -2112,7 +2139,8 @@
     <div class="notes md" id="p-notes"></div>
   </section>
   <aside>
-    <div class="panel"><h2>Next</h2><div class="next-title" id="p-next"></div><div class="next-sub" id="p-next-sub"></div></div>
+    <div class="panel"><h2>Next</h2><div class="next-title" id="p-next"></div><div class="next-sub" id="p-next-sub"></div>
+      <button type="button" data-cmd="continue" id="p-continue" class="carry" hidden title="Make this stop your place on the route (C)">Carry on from here instead (C)</button></div>
     <div class="panel"><h2>Detours from here</h2><div class="detours" id="p-detours"></div></div>
     <div class="panel"><h2>Drive the deck</h2><div class="keys">
       <button type="button" data-cmd="prev" aria-label="Previous">←</button>
@@ -2136,6 +2164,7 @@
       notes: byId("p-notes"),
       next: byId("p-next"),
       nextSub: byId("p-next-sub"),
+      carry: byId("p-continue"),
       detours: byId("p-detours"),
       blank: byId("p-blank"),
       map: byId("p-map"),
@@ -2230,7 +2259,9 @@
       const upcoming = x && x.i + 1 < x.stops.length ? x.stops[x.i + 1] : state.ahead;
       const un = upcoming && upcoming.kind !== "map" ? map.byId.get(upcoming.id) : null;
       els.next.textContent = !upcoming ? "The end" : upcoming.kind === "stop" ? un?.stop.title ?? "" : capitalise(targetLabel(map, upcoming, named));
-      els.nextSub.textContent = upcoming?.kind === "stop" && un ? [!named && un.stop.number !== null && `Stop ${pad2(un.stop.number)}`, un.detour && "Detour", un.parent && un.parent !== map.root && `in ${un.parent.stop.title}`, state.offRoute && !x && "rejoins the route"].filter(Boolean).join(" · ") : "";
+      const rejoin = state.offRoute && !x ? "rejoins the route" : "";
+      els.nextSub.textContent = upcoming?.kind === "stop" && un ? [!named && un.stop.number !== null && `Stop ${pad2(un.stop.number)}`, un.detour && "Detour", un.parent && un.parent !== map.root && `in ${un.parent.stop.title}`, rejoin].filter(Boolean).join(" · ") : capitalise(rejoin);
+      els.carry.hidden = state.touring || !nav.canContinueHere();
       els.detours.innerHTML = state.detours.length ? state.detours.map((id) => `<button type="button" data-detour="${esc(id)}">↓ ${esc(map.byId.get(id)?.stop.title ?? id)}</button>`).join("") : '<span class="none">None from here.</span>';
       els.blank.setAttribute("aria-pressed", String(state.blank));
       drawMap();
@@ -2271,7 +2302,9 @@
       Escape: "map",
       b: "blank",
       B: "blank",
-      ".": "blank"
+      ".": "blank",
+      c: "continue",
+      C: "continue"
     };
     window.addEventListener("keydown", (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.("select, input")) return;
