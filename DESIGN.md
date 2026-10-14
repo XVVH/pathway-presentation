@@ -229,6 +229,37 @@ For video this helps more than it hurts:
   south instead of east, so the final pull-back fills a portrait frame. It would be the
   same map in a different projection, like the strip map.
 
+### 10b. Density: how much a stop holds
+
+A deck sets its density in frontmatter (`density: talk`), and a single stop can
+override it (`## Wire protocol {density=technical}`). Density sets two things:
+
+- **Body type size relative to the card.** This sets the hard limit, because smaller
+  type means more words physically fit.
+- **The reading limit.** This is how much the audience can take in while listening.
+
+| Density | Body type | Line length | Fits at most | Warn above |
+|---|---|---|---|---|
+| **talk** (default) | 3.3% of card width | ~60 characters | ~120 words, 9 bullets, 11 code lines | 40 words, 5 bullets, 8 code lines |
+| **technical** | 2.6% of card width | ~72 characters | ~190 words, 11 bullets, 15 code lines | 160 words, 8 bullets, 12 code lines |
+
+The "fits at most" figures were measured at reading size with Sectional fonts and a
+one-line title. Text beside an image or video holds roughly half as much. Boardroom's
+wider font holds about 5% less.
+
+- **Error: it doesn't fit.** The content is taller than the size cap at reading size.
+  The camera would have to shrink the text, so this can't be overridden.
+- **Warning: too much to read while listening.** Only body text counts, not titles,
+  eyebrows or captions.
+- **The fix is a move, not a cut.** Spoken detail goes to the speaker notes, and
+  explorable detail becomes child stops. The checker proposes the specific split. For
+  example, bullets that each start with a bold phrase are really sub-stops, so it
+  suggests one child per bullet, with a one-line summary left on the parent.
+
+The default is deliberately light: on-screen content stays simple, and the speaker
+talks to it from the notes. A dense technical stop often works best as a **detour**,
+skipped by the route and one key away for the audience that wants it.
+
 ### 11. Built for agents
 
 - `pathway check` returns structural, reference and narrative diagnostics as JSON:
