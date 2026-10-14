@@ -95,9 +95,9 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
 #world { position: absolute; inset: 0; pointer-events: none; }
 
 /* Cards: laid out at reading size, then scaled by the camera, so at a stop the
-   scale is exactly 1. Each card has two layers: the readable content, and a
-   glance layer (large title, placeholder bars) shown whenever text would be too
-   small to read. Nobody squints at the map. */
+   scale is exactly 1. Nothing on a card ever resizes or reflows: when a line of
+   text gets too small to read, it dissolves into a bar the exact shape of itself
+   (greeking), and resolves back into words as you come closer. */
 .card {
   position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch);
   transform-origin: 0 0; container-type: size; visibility: hidden;
@@ -107,7 +107,8 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
 }
 .remote .card { box-shadow: none; }
 .card.detour { border-style: dashed; border-color: var(--trail); }
-.card .read, .card .glance { position: absolute; inset: 0; }
+.card .read, .card .bars { position: absolute; inset: 0; }
+.card .bars { pointer-events: none; }
 .card .read {
   padding: 6cqw 6.5cqw; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto;
   align-content: center; column-gap: 4.5cqw;
@@ -115,20 +116,16 @@ body { margin: 0; position: relative; background: var(--ground); color: var(--in
 .card.has-media:not(.wide-media) .read { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto; }
 .card.has-media:not(.wide-media) .read figure { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
 .card.wide-media figure { grid-row: 4; margin-top: 3cqw; }
-.glance { padding: 6cqw 7cqw; display: flex; flex-direction: column; justify-content: center; gap: 3cqw; opacity: 0; }
-.g-title { position: relative; }
-.g-text {
-  font-family: var(--font-display); font-weight: 600; font-size: var(--gt); line-height: 1.02; letter-spacing: 0.01em;
-  text-transform: var(--display-case); color: var(--ink); text-wrap: balance;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+.bars .bg { position: absolute; inset: 0; }
+.bars .bar { position: absolute; border-radius: 999px; background: var(--skeleton); }
+.bars .title .bar { background: var(--skeleton-strong); }
+.bars .bar.dot { background: var(--route); opacity: 0.45; }
+#tip {
+  position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; white-space: nowrap;
+  font: 600 13px/1 var(--font-display); letter-spacing: 0.07em; text-transform: var(--display-case); color: var(--ink);
+  background: var(--card); border: 1px solid var(--rule); border-bottom: 2px solid var(--route); border-radius: 4px;
+  padding: 5px 8px 4px; box-shadow: 0 6px 18px -8px var(--shadow);
 }
-.g-bar { position: absolute; left: 0; top: 0; width: 70%; height: calc(var(--gt) * 0.8); border-radius: 1.4cqw; background: var(--skeleton-strong); opacity: 0; }
-.g-lines { display: flex; flex-direction: column; gap: 2.2cqw; }
-.g-line { display: block; height: 2.8cqw; border-radius: 1.4cqw; background: var(--skeleton); }
-.g-line.li { margin-left: 4.5cqw; position: relative; max-width: calc(100% - 4.5cqw); }
-.g-line.li::before { content: ""; position: absolute; left: -4cqw; top: 0.5cqw; width: 1.8cqw; height: 1.8cqw; border-radius: 50%; background: var(--route); opacity: 0.5; }
-.g-block, .g-media { display: block; height: 14cqw; border-radius: 1.6cqw; background: var(--skeleton); }
-.g-media { background: color-mix(in srgb, var(--route) 16%, var(--card)); }
 
 .eyebrow {
   display: flex; gap: 1.6cqw; align-items: baseline;
@@ -229,7 +226,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
 .strip.map-open #strip { visibility: hidden; }
 .strip.map-open #btn-back { display: inline-block; }
 .strip.map-open .hud-bottom { display: flex; justify-content: center; }
-.strip.map-open #status, .strip.map-open .nav, .strip.map-open #minimap, .strip.map-open #btn-tour, .strip.map-open #btn-motion { display: none; }
+.strip.map-open #status, .strip.map-open .nav, .strip.map-open #minimap, .strip.map-open #btn-tour, .strip.map-open #btn-motion, .strip.map-open #btn-hover { display: none; }
 .s-bar {
   position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -282,6 +279,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
 <div id="stage" tabindex="0" aria-label="Pathway map. Use arrow keys to travel.">
   <canvas id="ground"></canvas>
   <div id="world"></div>
+  <div id="tip" hidden></div>
   <div id="hud">
     <div class="hud-row">
       <div id="crumbs" class="pill"></div>
@@ -289,6 +287,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <button id="btn-tour" type="button" title="Play the route as a video (V)"><span class="k">V</span><span>Play tour</span></button>
         <button id="btn-motion" type="button" title="Motion profile (R)"><span class="k">R</span><span>Cinematic</span></button>
         <button id="btn-skin" type="button" title="Skin (T)"><span class="k">T</span><span>Sectional</span></button>
+        <button id="btn-hover" type="button" title="Hover (H)"><span class="k">H</span><span>Hover: path</span></button>
         <button id="btn-bend" type="button" title="Curves (C)"><span class="k">C</span><span>Gentle curves</span></button>
         <button id="btn-help" type="button" title="Keys (?)">?</button>
       </div>
@@ -322,6 +321,7 @@ button .k { color: var(--ink-2); margin-right: 6px; }
         <dt>R</dt><dd>Motion: cinematic or remote (for screen share).</dd>
         <dt>T</dt><dd>Skin: Sectional or Boardroom.</dd>
         <dt>C</dt><dd>Curves: gentle, bold, or winding.</dd>
+        <dt>H</dt><dd>Hover a station to see the trail there, its name, or nothing.</dd>
         <dt>Drag, wheel, pinch</dt><dd>Explore freely. Click any station to fly there.</dd>
       </dl>
       <p>Keys work once this page has keyboard focus, so click anywhere first. Press ? to bring this legend back. On a narrow screen the route becomes a scrolling strip.</p>
@@ -757,31 +757,13 @@ function figHtml(n) {
     return `<figure><img src="${esc(m.src)}" alt="${esc(m.alt)}" decoding="async"></figure>`;
   }).join("");
 }
-function glanceHtml(n) {
-  const out = [], widths = [94, 86, 97, 78, 90];
-  let budget = n === root ? 2 : n.level >= 3 ? 4 : 5, wi = 0;
-  for (const b of n.blocks) {
-    if (budget <= 0) break;
-    if (b.t === "p") {
-      const lines = clamp(Math.ceil(b.words / 11), 1, 3);
-      for (let i = 0; i < lines && budget > 0; i++, budget--) out.push(`<span class="g-line" style="width:${lines > 1 && i === lines - 1 ? 58 : widths[wi++ % widths.length]}%"></span>`);
-    } else if (b.t === "li") { out.push(`<span class="g-line li" style="width:${clamp(36 + b.words * 4, 45, 90)}%"></span>`); budget--; }
-    else { out.push(`<span class="${b.t === "code" ? "g-block" : "g-media"}"></span>`); budget -= 2; }
-  }
-  return out.join("");
-}
 for (const n of nodes) {
   const card = document.createElement("article");
   const wide = n.media.some(m => m.attrs.classes.includes("wide"));
   card.className = ["card", n === root && "root", n.detour && "detour", n.media.length && "has-media", wide && "wide-media"].filter(Boolean).join(" ");
-  n.gt = n === root ? 0.15 : n.level >= 3 ? 0.13 : 0.105;
-  card.style.setProperty("--gt", `${n.gt * 100}cqw`);
-  card.innerHTML = `<div class="read">${eyebrowHtml(n)}${n === root ? `<h1>${esc(n.title)}</h1>` : `<h2>${esc(n.title)}</h2>`}<div class="md">${n.html}</div>${figHtml(n)}</div>`
-    + `<div class="glance" aria-hidden="true"><div class="g-title"><div class="g-text">${esc(n.title)}</div><span class="g-bar"></span></div><div class="g-lines">${glanceHtml(n)}</div></div>`;
+  card.innerHTML = `<div class="read">${eyebrowHtml(n)}${n === root ? `<h1>${esc(n.title)}</h1>` : `<h2>${esc(n.title)}</h2>`}<div class="md">${n.html}</div>${figHtml(n)}</div><div class="bars" aria-hidden="true"></div>`;
   worldEl.appendChild(card);
   n.card = card;
-  n.readEl = card.querySelector(".read"); n.glanceEl = card.querySelector(".glance");
-  n.gTextEl = card.querySelector(".g-text"); n.gBarEl = card.querySelector(".g-bar");
   n.video = card.querySelector("video");
   n.op = {};
 }
@@ -795,6 +777,58 @@ function setOp(n, key, el, value) {
   const q = Math.round(value * 50) / 50;
   if (n.op[key] === q) return;
   n.op[key] = q; el.style.opacity = q;
+}
+
+// Greeking: measure every line of text on every card at reading size, and lay a
+// bar exactly over each one. Each text element then crossfades with its own bars
+// by how many pixels tall its type is on screen, so nothing ever moves or rewraps.
+const LOD_RANGE = { title: [5.8, 7], eyebrow: [6.4, 7.6], code: [6.4, 7.6], caption: [6.4, 7.6], body: [7, 8] };
+function lineBoxes(el) {
+  const r = document.createRange(); r.selectNodeContents(el);
+  const lines = [];
+  for (const q of r.getClientRects()) {
+    if (q.width < 0.5 || q.height < 0.5) continue;
+    const L = lines.find(l => Math.abs(l.top - q.top) < 3 || (q.top >= l.top - 1 && q.bottom <= l.bottom + 1));
+    if (L) { L.left = Math.min(L.left, q.left); L.right = Math.max(L.right, q.right); L.top = Math.min(L.top, q.top); L.bottom = Math.max(L.bottom, q.bottom); }
+    else lines.push({ top: q.top, bottom: q.bottom, left: q.left, right: q.right });
+  }
+  return lines;
+}
+function measureLines() {
+  for (const n of nodes) {
+    const card = n.card, keep = card.style.transform;
+    card.style.transform = "none";
+    const box = card.getBoundingClientRect(), ox = box.left + card.clientLeft, oy = box.top + card.clientTop;
+    const groups = [], lod = [];
+    for (const el of card.querySelectorAll(".read .eyebrow, .read h1, .read h2, .read .md p, .read .md li, .read .md pre, .read figcaption")) {
+      const kind = el.matches(".eyebrow") ? "eyebrow" : el.matches("h1, h2") ? "title" : el.matches("pre") ? "code" : el.matches("figcaption") ? "caption" : "body";
+      const fs = parseFloat(getComputedStyle(el).fontSize);
+      const bars = lineBoxes(el).map((L, j) => {
+        const h = fs * (kind === "title" ? 0.62 : 0.5), y = L.top + (L.bottom - L.top - h) / 2;
+        let b = `<span class="bar" style="left:${(L.left - ox).toFixed(1)}px;top:${(y - oy).toFixed(1)}px;width:${(L.right - L.left).toFixed(1)}px;height:${h.toFixed(1)}px"></span>`;
+        if (el.tagName === "LI" && j === 0) {
+          const d = fs * 0.36;
+          b += `<span class="bar dot" style="left:${(L.left - ox - fs * 0.95).toFixed(1)}px;top:${(L.top + (L.bottom - L.top - d) / 2 - oy).toFixed(1)}px;width:${d.toFixed(1)}px;height:${d.toFixed(1)}px"></span>`;
+        }
+        return b;
+      }).join("");
+      groups.push(`<div class="bg ${kind}" style="opacity:0">${bars}</div>`);
+      lod.push({ el, px: fs, range: LOD_RANGE[kind], kind });
+    }
+    const layer = card.querySelector(".bars");
+    layer.innerHTML = groups.join("");
+    [...layer.children].forEach((g, i) => { lod[i].bars = g; });
+    for (const L of lod) L.el.style.opacity = "";
+    n.lod = lod; n.op = {};
+    card.style.transform = keep;
+  }
+}
+let assetsReady = false, linesKey = "";
+function ensureLines() {
+  if (!stage.clientWidth) return;
+  const key = `${cw}|${docEl.dataset.skin || ""}|${assetsReady}`;
+  if (key === linesKey) return;
+  linesKey = key; measureLines();
 }
 
 // ---------------------------------------------------------------- viewport, framing
@@ -1045,6 +1079,7 @@ function tourTime() { if (!tour) return 0; if (tour.playing) tour.t = Math.min(t
 
 // ---------------------------------------------------------------- render
 function render(tl, t) {
+  ensureLines();
   const cam = tl.camAt(t), k = vw / cam.w;
   const { lit, visited } = tl.litAt(t);
   const [seg] = tl.segAt(t);
@@ -1110,6 +1145,19 @@ function render(tl, t) {
     }
     ctx.strokeStyle = T.route; ctx.lineWidth = (e.trunk ? 3.4 : 2.6) / k; ctx.stroke();
   }
+  // hover: preview the trail from where you are to the station under the cursor
+  if (hoverNode && mode === "live" && hoverMode !== "off") {
+    const from = currentTarget().node || root;
+    ctx.setLineDash([9 / k, 7 / k]); ctx.strokeStyle = T.route; ctx.globalAlpha = 0.55; ctx.lineWidth = 3 / k;
+    for (const p of trailPath(from, hoverNode)) {
+      const e = byId[p.id].edge;
+      ctx.beginPath(); e.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 0.9; ctx.lineWidth = 2.5 / k;
+    const pad = 7 / k, h = hoverNode;
+    ctx.beginPath(); ctx.roundRect(h.x - h.ww / 2 - pad, h.y - h.wh / 2 - pad, h.ww + 2 * pad, h.wh + 2 * pad, 14 / k); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
   // stations too small to show a card become dots
   for (const n of nodes) {
     if (n.ww * k > 30) continue;
@@ -1118,7 +1166,7 @@ function render(tl, t) {
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // cards: position, and choose between the readable layer and the glance layer
+  // cards: position, then greek each line by its size on screen
   const focusNode = seg.target.kind === "node" ? seg.target.node : null;
   for (const n of nodes) {
     const [sx, sy] = toScreen(n.x, n.y), sw = n.ww * k, sh = n.wh * k;
@@ -1129,15 +1177,11 @@ function render(tl, t) {
       if (n.cardVis !== true) { n.card.style.visibility = "visible"; n.cardVis = true; }
       n.card.style.transform = `translate(${(sx - sw / 2).toFixed(2)}px, ${(sy - sh / 2).toFixed(2)}px) scale(${(sw / cw).toFixed(5)})`;
       setOp(n, "card", n.card, op);
-      // Hand over in sequence, never overlapping: the glance layer leaves before the
-      // readable layer arrives, so no card ever shows two titles at once.
-      const bodyPx = 0.033 * sw, titlePx = n.gt * sw;
-      const glance = 1 - smoothstep(9.4, 10, bodyPx), read = smoothstep(10, 10.8, bodyPx);
-      const titleText = smoothstep(7.5, 10.5, titlePx);
-      setOp(n, "read", n.readEl, read);
-      setOp(n, "glance", n.glanceEl, glance);
-      setOp(n, "gtext", n.gTextEl, titleText);
-      setOp(n, "gbar", n.gBarEl, 1 - titleText);
+      const sc = sw / cw;
+      if (n.lod) for (let i = 0; i < n.lod.length; i++) {
+        const L = n.lod[i], v = smoothstep(L.range[0], L.range[1], L.px * sc);
+        setOp(n, "t" + i, L.el, v); setOp(n, "b" + i, L.bars, 1 - v);
+      }
     }
     if (n.video && (sw > 140 || n === focusNode)) loadVideo(n.video);
     if (n.video && !CAPTURE) {
@@ -1333,13 +1377,14 @@ const keyMap = {
   ArrowRight: next, " ": next, PageDown: next, ArrowLeft: prev, PageUp: prev,
   ArrowDown: dive, ArrowUp: surface, m: showMap, M: showMap, Escape: () => (mode === "tour" ? exitTour() : showMap()),
   Home: () => presenting() && goStop(0), End: () => presenting() && goStop(route.length - 1),
-  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, c: cycleBend, C: cycleBend, v: toggleTour, V: toggleTour, "?": toggleHelp,
+  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, c: cycleBend, C: cycleBend, h: cycleHover, H: cycleHover, v: toggleTour, V: toggleTour, "?": toggleHelp,
 };
 window.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (stripMode && !mapOpen && !["t", "T", "c", "C", "?"].includes(e.key)) return;  // let the strip scroll natively
   if (mode === "tour" && e.key === " ") { e.preventDefault(); togglePlay(); return; }
   if (e.key !== "?") hideHelp();
+  if (!["h", "H"].includes(e.key)) setHover(null);
   const f = keyMap[e.key];
   if (f) { e.preventDefault(); f(); }
 });
@@ -1352,6 +1397,7 @@ function toggleSkin() {
   if (docEl.dataset.skin === "boardroom") delete docEl.dataset.skin; else docEl.dataset.skin = "boardroom";
   document.querySelector("#btn-skin span:last-child").textContent = docEl.dataset.skin === "boardroom" ? "Boardroom" : "Sectional";
   readTokens(); dirty = true;
+  document.fonts.ready.then(() => { linesKey = ""; dirty = true; });
 }
 function toggleTour() { if (stripMode) return; if (mode === "tour") exitTour(); else if (mode === "live") enterTour(); }
 const helpEl = document.getElementById("help");
@@ -1389,6 +1435,38 @@ document.getElementById("btn-back").onclick = () => closeMap();
 document.getElementById("btn-motion").onclick = toggleMotion;
 document.getElementById("btn-skin").onclick = toggleSkin;
 document.getElementById("btn-bend").onclick = cycleBend;
+document.getElementById("btn-hover").onclick = cycleHover;
+
+// Hover (mouse only). "path" previews the trail to a station and invites the trip;
+// "name" also names it when its title is too small to read; "off" leaves the
+// map silent. Touch has no hover, so nothing here is ever required.
+const HOVER = { path: "Hover: path", name: "Hover: name", off: "Hover: off" };
+let hoverMode = "path", hoverNode = null, hoverPt = null;
+const tipEl = document.getElementById("tip");
+function cycleHover() {
+  const order = Object.keys(HOVER);
+  hoverMode = order[(order.indexOf(hoverMode) + 1) % order.length];
+  document.querySelector("#btn-hover span:last-child").textContent = HOVER[hoverMode];
+  setHover(null);
+}
+function setHover(n) {
+  if (n !== hoverNode) { hoverNode = n; dirty = true; stage.style.cursor = n ? "zoom-in" : ""; }
+  const L = n?.lod?.find(l => l.kind === "title");
+  const small = n && (!L || L.px * (n.ww * vw / camNow().w / cw) < 9);
+  tipEl.hidden = !(n && hoverMode === "name" && small);
+  if (!tipEl.hidden && hoverPt) {
+    const r = stage.getBoundingClientRect();
+    tipEl.textContent = n.title;
+    tipEl.style.transform = `translate(${hoverPt.x - r.left + 14}px, ${hoverPt.y - r.top + 18}px)`;
+  }
+}
+stage.addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse" || mode !== "live") return;
+  if (drag || hoverMode === "off" || e.target.closest("#hud button, #hud .pill, #help")) { setHover(null); return; }
+  hoverPt = { x: e.clientX, y: e.clientY };
+  setHover(hitTest(e.clientX, e.clientY));
+});
+stage.addEventListener("pointerleave", () => setHover(null));
 document.getElementById("btn-tour").onclick = toggleTour;
 document.getElementById("btn-help").onclick = toggleHelp;
 document.getElementById("btn-play").onclick = togglePlay;
@@ -1498,6 +1576,8 @@ measure();
 readTokens();
 live = new Timeline(camForStop(route[0]), route[0]);
 document.querySelector("#btn-bend span:last-child").textContent = `${BENDS[bend].label} curves`;
+const assets = Promise.all([document.fonts.ready, ...[...worldEl.querySelectorAll("img")].map(img => img.decode().catch(() => {}))]);
+if (!CAPTURE) assets.then(() => { assetsReady = true; dirty = true; });
 applyMode();
 updateHud();
 if (CAPTURE) {
@@ -1507,8 +1587,7 @@ if (CAPTURE) {
   nodes.forEach(n => n.video && loadVideo(n.video));
   const vids = nodes.filter(n => n.video);
   const ready = Promise.all([
-    document.fonts.ready,
-    ...[...document.images].map(img => img.decode().catch(() => {})),
+    assets.then(() => { assetsReady = true; ensureLines(); }),
     ...vids.map(n => new Promise(res => { if (n.video.readyState >= 2) res(); else { n.video.addEventListener("loadeddata", res, { once: true }); n.video.addEventListener("error", res, { once: true }); } })),
   ]);
   window.pathway = {

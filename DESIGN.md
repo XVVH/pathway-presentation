@@ -37,34 +37,31 @@ Rooms read as hierarchy even when the content is hierarchical, so the map is ter
   heading, then slides forward until it touches nothing. Curves can't cause collisions,
   however many branches there are. There are no coordinates in the source, ever.
 
-### 1a. One title per station, and no text too small to read
+### 1a. Greek in place: nothing resizes, nothing rewraps
 
-Each card has two layers, and the camera picks one by how large the text would be on
-screen:
+Every card is laid out once, at reading size, and only ever scales with the camera.
+When a line of text gets too small to read, it dissolves into a bar the exact shape
+of itself, measured from the line's real box, and resolves back into words as you
+come closer. This old typesetting trick is called greeking. Each element crossfades
+with its own bars by how many pixels tall its type is on screen: body at ~7-8px, titles
+a little later at ~6-7px, because they are bigger to begin with.
 
-- **Read**: the full content, shown only when body text is at least ~10px on screen.
-- **Glance**: the title set large, with placeholder bars standing in for paragraphs,
-  bullets, code and media (the way a page shows skeletons while loading). The bars show
-  how much is there without inviting anyone to squint. Below ~8px even the title
-  becomes a bar.
+- People read while the camera moves, so nothing a reader might be following ever
+  jumps, resizes or rewraps. (`spike/text-zoom-lab.html` compared four approaches;
+  swapping to a larger glance title broke reading mid-zoom.)
+- The map labels itself the way a real map does. From far out, the large trunk titles
+  are still readable, like city names, and branch detail is shapes, like streets. The
+  hierarchy comes from size alone.
+- There are no separate floating labels. The card is its own label.
+- The text stays in the page (only its opacity changes), so screen readers and
+  find-in-page still see all of it.
 
-The layers hand over in sequence, never overlapping, so a card never shows two titles.
-There are no separate floating map labels: the card is its own label.
-
-**Open: the swap breaks reading.** People read while the camera moves, so a title that
-jumps in size and rewraps mid-zoom pulls their eye off the line. `spike/text-zoom-lab.html`
-runs four candidates side by side on the same camera loop:
-
-1. **Now**: swap to the glance card (the baseline above).
-2. **Greek in place**: nothing ever resizes or moves. Each line dissolves into a bar the
-   exact shape of itself, measured from the real line boxes, when it gets too small to read.
-3. **Held title**: the title keeps its line breaks and holds a readable size, like a
-   map label, while the card grows or shrinks around it. Body lines dissolve in place.
-4. **Signpost**: the card only scales and dissolves in place; a fixed-size sign on its
-   top edge names it only while its own title is unreadable.
-
-Leaning toward 3: it keeps the map legible without ever changing a line break, and the
-title appears to wait while the card catches up to it.
+**Hover (mouse only, never required).** Zooming to read is the fun of this format, so
+hover should invite the trip, not replace it. The default, **path**, lifts the station
+with a ring and draws the trail from where you are to it as a dashed route line; one
+click flies there. **Name** also shows the title when it is too small to read. **Off**
+keeps the map silent. Moving the camera or pressing a key clears hover, so a presenter's
+idle cursor never decorates the screen.
 
 ### 2. Motion grammar
 
@@ -226,7 +223,7 @@ includes:
 
 - a tiny Markdown parser
 - the curved landscape layout, and contour terrain shaped around the stations
-- glance cards
+- greek-in-place cards, and hover previews
 - trail-following and van Wijk flights, and the lit trail
 - the route, with detours and rejoin
 - explore by drag, wheel and pinch, plus the minimap
@@ -270,8 +267,8 @@ What it taught us so far:
 
 From the first review:
 
-- Tiny text invites squinting. Glance cards with placeholder bars fixed it, and the map
-  now reads at a glance.
+- Tiny text invites squinting. Placeholder bars fixed that, but swapping to a larger
+  glance title broke reading mid-zoom. Greeking in place fixed both.
 - Fast, evenly paced moves felt like jumps. Ramped moves along the trail itself feel
   like travelling a path.
 - Floating labels duplicated card titles and overlapped cards. Making the card its own
