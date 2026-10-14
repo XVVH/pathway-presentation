@@ -59,6 +59,20 @@ export function runsOf(children: readonly Token[] | null): Run[] {
   return runs;
 }
 
+/**
+ * A paragraph holding only an image, optionally followed by {attributes}, is a
+ * figure. Returns the image token and the attribute text inside the braces.
+ */
+export function figureParts(inline: Token): { image: Token; attrs: string | null } | null {
+  const kids = (inline.children ?? []).filter(c => !(c.type === "softbreak" || (c.type === "text" && !c.content.trim())));
+  if (!kids.length || kids[0].type !== "image") return null;
+  const after = kids.slice(1);
+  if (after.length > 1) return null;
+  if (!after.length) return { image: kids[0], attrs: null };
+  const m = after[0].type === "text" ? /^\s*\{([^{}]*)\}\s*$/.exec(after[0].content) : null;
+  return m ? { image: kids[0], attrs: m[1] } : null;
+}
+
 export function runsText(runs: readonly Run[]): string {
   return runs.map(r => r.text).join("").replace(/\s+/g, " ").trim();
 }

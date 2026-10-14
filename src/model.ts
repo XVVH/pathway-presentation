@@ -72,7 +72,7 @@ export type Block =
   | { kind: "paragraph"; line: number; endLine: number; runs: Run[]; text: string; words: number }
   | { kind: "list"; line: number; endLine: number; ordered: boolean; items: ListItem[] }
   | { kind: "code"; line: number; endLine: number; lang: string; lines: string[] }
-  | { kind: "quote"; line: number; endLine: number; runs: Run[]; text: string; words: number }
+  | { kind: "quote"; line: number; endLine: number; runs: Run[]; text: string; words: number; paragraphs: Run[][] }
   | { kind: "table"; line: number; endLine: number; rows: number; text: string; words: number }
   | { kind: "media"; line: number; endLine: number; media: MediaRef }
   | { kind: "html"; line: number; endLine: number }
@@ -136,7 +136,10 @@ export interface NotesSection {
   /** True when the heading names its stop with {#id}; otherwise it matches by title. */
   explicitId: boolean;
   title: string;
+  /** Line of the heading. */
   line: number;
+  /** Last line of the section, before the next heading. */
+  endLine: number;
   words: number;
 }
 

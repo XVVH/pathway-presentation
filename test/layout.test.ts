@@ -1,6 +1,6 @@
 // The checker's size estimate, held to real browser measurements. To refresh the
 // measurements after changing the type scale or fonts, run:
-//   node scripts/calibrate.mjs examples/pathway/pathway.md test/fixtures/calibration/calibration.md --write test/calibration.json
+//   node scripts/calibrate.mjs examples/pathway/pathway.md test/fixtures/calibration/calibration.md test/fixtures/kitchen/kitchen.md --write test/calibration.json
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

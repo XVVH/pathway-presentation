@@ -1,0 +1,56 @@
+/* Skin "Sectional": an aeronautical chart. Pale chart paper, tan contours, and
+   the route drawn as the magenta line pilots follow.
+
+   A skin is colours, fonts and the camera's feel, as CSS custom properties.
+   Card type sizes come from src/typography.ts; the fonts here must match the
+   face tables it names, or the checker's size estimates drift. */
+
+@font-face { font-family: "Barlow"; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+@font-face { font-family: "Barlow"; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+@font-face { font-family: "Barlow Condensed"; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: block; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: block; }
+
+:root {
+  --ground: #EDF0EA;
+  --contour: #C9BBA3;
+  --contour-major: #B09C7E;
+  --trail: #8E98A7;
+  --route: #B3127C;
+  --card: #FCFCFA;
+  --rule: #D5DACF;
+  --ink: #1A2130;
+  --ink-2: #566071;
+  --code-bg: #EFF2EB;
+  --skeleton: #E2E6DE;
+  --skeleton-strong: #C4CBBF;
+  --shadow: rgba(26, 33, 48, 0.16);
+  --hud-bg: rgba(237, 240, 234, 0.86);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --display-case: uppercase;
+  /* contours or dots */
+  --terrain: contours;
+  /* Camera: speed multiplier, longest flight (s), and how high long jumps climb. */
+  --flight-speed: 1;
+  --flight-max: 3.6;
+  --flight-rho: 1.414;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0E1420; --contour: #1F2B40; --contour-major: #2B3B57; --trail: #55627A;
+    --route: #F0489F; --card: #151D2B; --rule: #253147; --ink: #E5E9F0; --ink-2: #97A2B4;
+    --code-bg: #101725; --skeleton: #1F293B; --skeleton-strong: #313E57;
+    --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(14, 20, 32, 0.84);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0E1420; --contour: #1F2B40; --contour-major: #2B3B57; --trail: #55627A;
+  --route: #F0489F; --card: #151D2B; --rule: #253147; --ink: #E5E9F0; --ink-2: #97A2B4;
+  --code-bg: #101725; --skeleton: #1F293B; --skeleton-strong: #313E57;
+  --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(14, 20, 32, 0.84);
+  color-scheme: dark;
+}

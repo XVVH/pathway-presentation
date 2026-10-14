@@ -1,5 +1,6 @@
 // Measures real card heights in a browser and compares them with the checker's
-// estimates. The prototype in spike/ is the reference renderer for now.
+// estimates. Each deck is built with the real engine, once per skin, and the
+// page reports the natural height of every card at the reference width.
 //
 //   node scripts/calibrate.mjs <deck.md>... [--write test/calibration.json]
 //
@@ -8,13 +9,17 @@
 
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parseDeck } from "../src/parse.ts";
+import { checkDeck } from "../src/check.ts";
+import { compileDeck } from "../src/compile.ts";
 import { estimateStop } from "../src/layout.ts";
 import { imageSize } from "../src/media.ts";
 import { nodeIo } from "../src/io-node.ts";
+import { loadAssets, renderPage } from "../src/page.ts";
+import { parseDeck } from "../src/parse.ts";
 
 const require = createRequire(import.meta.url);
 const { chromium } = (() => { try { return require("playwright"); } catch { return require(resolve(execSync("npm root -g").toString().trim(), "playwright")); } })();
@@ -27,42 +32,26 @@ const SKINS = ["sectional", "boardroom"];
 const browser = await chromium.launch();
 const results = [];
 for (const deckPath of decks) {
-  const source = readFileSync(deckPath, "utf8");
-  // Embed the deck in a copy of the prototype, in a scratch folder holding the
-  // deck's media and a link to the prototype's fonts.
-  const scratch = resolve(root, "spike/.calibrate");
-  rmSync(scratch, { recursive: true, force: true });
-  mkdirSync(resolve(scratch, "media"), { recursive: true });
-  const deckMedia = resolve(dirname(resolve(deckPath)), "media");
-  if (existsSync(deckMedia)) cpSync(deckMedia, resolve(scratch, "media"), { recursive: true });
-  symlinkSync(resolve(root, "spike/media/fonts"), resolve(scratch, "media/fonts"));
-  const html = readFileSync(resolve(root, "spike/index.html"), "utf8").replace(/(<script type="text\/markdown" id="deck">\n)[\s\S]*?(<\/script>)/, `$1${source}\n$2`);
-  const page = resolve(scratch, "index.html");
-  writeFileSync(page, html);
   const measured = {};
   for (const skin of SKINS) {
+    const check = checkDeck(deckPath, nodeIo, { notes: null });
+    check.deck.meta.skin = skin;
+    const { payload, media } = compileDeck(check, nodeIo);
+    const assets = loadAssets(skin);
+    const scratch = mkdtempSync(join(tmpdir(), "pathway-calibrate-"));
+    writeFileSync(join(scratch, "index.html"), renderPage(payload, assets));
+    for (const rel of media) { mkdirSync(dirname(join(scratch, rel)), { recursive: true }); copyFileSync(join(dirname(deckPath), rel), join(scratch, rel)); }
+    mkdirSync(join(scratch, "fonts"));
+    for (const f of assets.fonts) copyFileSync(join(root, "skins/fonts", f), join(scratch, "fonts", f));
     const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    await tab.goto(`${pathToFileURL(page).href}?skin=${skin}&cards=fitted`);
-    await tab.evaluate(() => document.fonts.ready);
-    await tab.waitForTimeout(400);
-    measured[skin] = await tab.evaluate(async () => {
-      await Promise.all([...document.querySelectorAll("#world img")].map(img => img.decode().catch(() => {})));
-      const broken = [...document.querySelectorAll("#world img")].filter(img => !img.naturalWidth).map(img => img.getAttribute("src"));
-      if (broken.length) return { broken };
-      const box = document.createElement("div"); box.className = "measure"; document.body.appendChild(box);
-      const out = [...document.querySelectorAll("#world .card")].map(card => {
-        const clone = card.cloneNode(true); clone.removeAttribute("style"); clone.querySelector(".bars")?.remove();
-        box.appendChild(clone);
-        const r = clone.offsetHeight / box.clientWidth; clone.remove();
-        return { title: card.querySelector("h1, h2").textContent, ratio: Math.round(r * 10000) / 10000 };
-      });
-      box.remove();
-      return out;
-    });
+    await tab.goto(`${pathToFileURL(join(scratch, "index.html")).href}?capture`);
+    await tab.evaluate(() => window.pathway.ready);
+    const broken = await tab.evaluate(() => [...document.querySelectorAll("#world img")].filter(img => !img.naturalWidth).map(img => img.getAttribute("src")));
+    if (broken.length) throw new Error(`images failed to load in the browser: ${broken.join(", ")}`);
+    measured[skin] = (await tab.evaluate(() => window.pathway.measure())).map(({ title, ratio }) => ({ title, ratio }));
     await tab.close();
-    if (measured[skin].broken) throw new Error(`images failed to load in the browser: ${measured[skin].broken.join(", ")}`);
+    rmSync(scratch, { recursive: true, force: true });
   }
-  rmSync(scratch, { recursive: true, force: true });
   results.push({ deck: deckPath, measured });
 }
 await browser.close();

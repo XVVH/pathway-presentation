@@ -12,11 +12,29 @@ Pandoc-style `{attributes}` and `[[wiki links]]`.
 3. Fix every error, then the warnings. Each diagnostic has a line and usually a
    `fix`.
 4. Repeat until it reports no problems.
+5. Run `pathway fmt --write deck.md` to tidy the layout.
 
 `pathway check deck.md --fix` applies the fixes marked `safe`.
 `pathway outline deck.md --json` shows the tree, ids, word counts, card sizes and
 the route, which is useful before restructuring. (From a clone of this repo, run
 `node src/cli.ts` in place of `pathway`.)
+
+To see what the audience sees, `pathway render deck.md --stop <id>` saves a PNG of
+one stop (`--map` for the whole map, `--all` for everything) into `deck-shots/`. Look
+at crowded stops before calling a deck done. It needs Playwright; if it isn't
+installed, say so rather than installing it unasked.
+
+## Presenting
+
+- `pathway present deck.md` serves the deck on this machine (127.0.0.1), reloads it
+  as the files change, and shows check errors over the page. Press P for the
+  presenter window with the speaker notes.
+- `pathway build deck.md` writes `deck-build/`: open its `index.html` in any browser,
+  offline. It refuses a deck with errors (`--force` overrides). Speaker notes stay
+  out unless you pass `--with-notes`; don't add that flag unless the person asked,
+  since anyone with the folder can read them.
+- Keys: → next, ← back, ↓ detour, ↑ pull back, M map, P presenter, V tour, R remote
+  (for screen share), B blank, D dark or light, F full screen, ? help.
 
 ## Files
 
@@ -76,15 +94,18 @@ Skipped by the route; one key away when someone asks. See [[intake]].
 
 - Paragraphs and bullet lists. A bullet that opens with a **bold phrase** reads as
   a heading: when a stop is crowded, each one should become a child stop.
+- Numbered lists, nested lists, block quotes, tables and `---` rules.
 - Fenced code blocks. Lines wider than the card are cut off, and the checker says
   where.
 - **One** image or video per stop, on a line of its own:
   - `![Alt text](media/x.png)`: sits beside the text.
   - `![Alt text](media/x.png){.wide}`: spans the card below the text.
   - Video: `![Caption](media/clip.mp4){loop}`. Its alt text becomes the caption.
-  - Media must be local files inside the deck folder. URLs work only online and
-    can't be rendered into video.
-- Links between stops: `[[stop-id]]` or `[[stop-id|link text]]`.
+  - Media must be local files inside the deck folder. Media from the web, or from
+    outside the folder, shows as a placeholder: a built deck never reaches the
+    network.
+- Links between stops: `[[stop-id]]` or `[[stop-id|link text]]`. On screen they
+  take you there. Web links open in a new tab.
 - No raw HTML. It isn't rendered.
 
 ### Density
@@ -132,7 +153,9 @@ flagged.
 - **The default route** is reading order. It starts and ends on the whole map, and
   pulls back over each branch when the branch ends. Detours are skipped.
 - **Named routes** in the frontmatter list stop ids in the order to visit them.
-  They're useful for a short cut of a long talk.
+  They're useful for a short cut of a long talk. Pick one in the presenter window,
+  or open the deck with `?route=name`. A route starts on the whole map and the title,
+  and ends on the whole map.
 
 ## `check --json` output
 

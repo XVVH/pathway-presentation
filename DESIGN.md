@@ -119,13 +119,14 @@ Opening `index.html` from disk (`file://`) blocks module scripts and `fetch`. It
 **not** block `<img>`, `<video>` or fonts loaded by relative path. So:
 
 ```
-my-talk/
-  index.html        code, styles, and all text, inlined
-  media/            images, video, fonts as plain files
+my-talk-build/
+  index.html        the engine, styles and all text, inlined
+  media/            the images and video the deck uses, as plain files
+  fonts/            the skin's fonts, with their licence
 ```
 
-Zip it, host it, or double-click it. `--single-file` is an opt-in for small,
-image-only decks you want to email.
+`pathway build` makes it. Zip it, host it, or double-click it. `--single-file` could
+become an opt-in for small, image-only decks you want to email.
 
 The build earns its keep on media:
 
@@ -189,19 +190,30 @@ notes you hand out today can lead the strip.
 ### 9. Offline and private by default
 
 A built deck makes zero network requests: no CDNs, no hosted fonts, no telemetry.
-Fonts ship in `media/fonts/`. Speaker notes are never in the build unless asked for.
+Fonts ship in `fonts/`. Speaker notes are never in the build unless asked for
+(`--with-notes`, which says so when it runs).
+
+This is enforced, not just intended. The page carries a content security policy that
+allows only its own inline engine (by hash) and files beside it. A deck that links an
+image from the web gets a placeholder at build time, and even a hand-edited page can't
+fetch anything. `pathway present` listens on 127.0.0.1 only, answers only to that host
+name (so a web page can't reach it by DNS rebinding), and serves only the files the
+deck uses: not the deck's source, not its notes file, nothing else in the folder.
 
 ### 10. Skins are tokens for color, type, and motion
 
-A skin is a CSS file of custom properties, with light and dark values. It sets palette
-and typefaces, plus motion: flight speed, maximum duration, how high flights climb, the
-terrain style, and how hard the trails bend (`--bend`: gentle, bold or winding). A
-corporate skin moves briskly over gently curving trails; a personal one can take its
-time on winding ones. The prototype ships two: **Sectional** (an aeronautical chart,
-with the route drawn as the magenta line, bold curves) and **Boardroom** (gentle).
+A skin is a CSS file of custom properties (`skins/<name>.css`), with light and dark
+values. It sets palette and typefaces, plus motion: flight speed, maximum duration, how
+high flights climb, and the terrain style. Each skin also picks how hard the trails
+bend (gentle, bold or winding, in `src/typography.ts`). A corporate skin moves briskly
+over gently curving trails; a personal one can take its time on winding ones. Two ship:
+**Sectional** (an aeronautical chart, with the route drawn as the magenta line, bold
+curves) and **Boardroom** (gentle).
 
 A skin changes the map's geography as well as its look: new curves, and new card
-heights, since its fonts set differently. Switching skins re-lays the map.
+heights, since its fonts set differently. So the skin is chosen when the deck is
+built, and the map is fixed from then on. The audience can still switch between light
+and dark (D).
 
 ### 10a. Cards fit their content, within a system
 
@@ -269,18 +281,22 @@ skipped by the route and one key away for the audience that wants it.
   them into child stops.
 - **The size check needs no browser.** It wraps text word by word using advance
   widths measured from the skins' real fonts (`src/metrics.ts`). Tests hold it to
-  real browser measurements of 60 cards in both skins, including deliberately
-  overflowing ones. It agrees within 0.003 of card width on nearly every card,
-  under a tenth of a line. On the longest paragraphs it runs about one line high,
-  so it errs toward flagging.
+  measurements of 80 cards in both skins, taken from the real engine in a browser:
+  paragraphs, lists (bulleted, numbered, nested), code, quotes, tables, rules,
+  images beside and below text, video, technical density, and deliberately
+  overflowing stops. It agrees within 0.002 of card width on every card that fits.
+  On the longest paragraphs it runs about one line high, so it errs toward flagging.
 - `src/typography.ts` is the single source of truth for the type scale. The checker
-  estimates from it, and the renderer must set cards from it. Two parts of the
-  contract aren't in the prototype yet: block quotes and tables.
-- `pathway render --stop <id>` writes a PNG, so a vision model can critique density
-  and layout.
+  estimates from it, and the page's card CSS is generated from it, so they can't
+  drift apart. The build bakes each card's height from the estimate, so the map is
+  identical on every screen and in every render.
+- `pathway render deck.md --stop <id>` (or `--all`) writes PNGs as the audience sees
+  them, so a vision model can critique density and layout. It needs Playwright,
+  which nothing else does.
 - `AGENTS.md` describes the format in a page. Since the format invents nothing, it
   stays short.
-- `pathway fmt` normalizes what an LLM writes.
+- `pathway fmt` normalizes what an LLM writes, without changing what it says: tests
+  check the parsed deck is the same before and after.
 
 ### 12. Stack: TypeScript
 
@@ -289,10 +305,42 @@ lets it share types with the runtime and run in two hosts: a Node CLI for agents
 CI, and a browser page you drop a folder onto. That second host matters if Node can't
 be installed on a locked-down work machine.
 
+### 13. The presenter window follows the audience window
+
+Press P and the deck opens a second window of itself, in presenter mode: your notes
+for where the talk is, the next stop, the detours within reach (click one to take
+it), a timer and clock, the route picker, and the map with the walked trail.
+
+- **The audience window is the source of truth.** It sends where it is; the presenter
+  sends back commands. The two talk by `postMessage`, which works from a file on disk
+  as well as from `pathway present`, and every message carries a random token.
+- **Either window takes the keys.** A clicker sends Page Down to whichever window has
+  focus, so both drive the talk. B blanks the audience screen.
+- **Reloads are survivable.** The audience window remembers its place for the tab
+  (route, stop, walked trail), and the presenter keeps saying hello until it hears
+  back, so a live reload in `pathway present` relinks by itself.
+
+### 14. The engine: a pure core, a thin page
+
+The browser engine is TypeScript in `src/runtime/`, in two layers:
+
+- **A core with no DOM**, tested in Node: the map layout (`map.ts`), terrain
+  (`terrain.ts`), camera framing (`camera.ts`), the timeline and flights
+  (`timeline.ts`), routes, detours and rejoining (`navigator.ts`), and tours
+  (`tour.ts`).
+- **The page**: cards and greeking, the canvas ground and minimap, the HUD, input,
+  the strip map, the presenter window, and the capture API that `render` and video
+  export drive.
+
+esbuild bundles it into `runtime/pathway.js`, which is committed, so building a deck
+needs no bundler. CI checks the bundle is current. The bundle isn't minified: someone
+asked to trust a page on a work machine can read it.
+
 ## The prototype (`spike/`)
 
-A throwaway, single-file proof of the riskiest part: does the motion feel right? It
-includes:
+A throwaway, single-file proof of the riskiest part: does the motion feel right? The
+engine in `src/runtime/` replaced it as the reference renderer; it stays as a record
+of how the motion was tuned. It includes:
 
 - a tiny Markdown parser
 - the curved landscape layout, and contour terrain shaped around the stations
@@ -352,10 +400,15 @@ From the first review:
 ## Open questions
 
 1. Should vertical video renders run the trunk south (see 10a)?
-2. Route syntax for named routes: a list in frontmatter, or a sidecar `*.route` file?
+2. ~~Route syntax~~: a list of stop ids in the frontmatter. It's enough for a short
+   cut of a long talk; revisit if routes need pauses or custom pull-backs.
 3. Takeaway syntax: a `> takeaway:` line, or the first sentence of each trunk stop?
 4. Follow link: is a relay acceptable for work talks, or personal/consultancy only?
 5. Can Node run on the work machine, or does the browser-hosted compiler come first?
+   A built deck needs only a browser, so building elsewhere and copying the folder
+   in works today; a browser-hosted compiler would let you edit there too.
+7. Custom skins: a `skin: ./brand.css` path in the frontmatter, for a day-job palette,
+   with a check that its fonts have measured widths.
 6. How far down does semantic zoom go: should diagrams have stations inside them
    ("zoom into the API Gateway box")?
 
@@ -366,11 +419,14 @@ From the first review:
 1. ~~Format~~: the parser, `pathway check` with JSON diagnostics and safe fixes,
    `pathway outline`, `AGENTS.md`. `fmt` and `render --stop` are deferred to step 2,
    which brings the renderer they need.
-2. Present mode: the engine from the prototype as a typed module, a presenter window
-   with notes, timer and the detours available here, and named routes.
+2. ~~Present mode~~: the engine as typed modules driven by parsed decks;
+   `pathway present` (local, live reload, notes), `pathway build` (an offline folder
+   behind a strict content security policy), the presenter window (13), named routes,
+   `fmt`, and `render`. Checked in a real browser by `npm run e2e`.
 3. Explore and handoff: the phone layout, QR on the final view, takeaways.
 4. Media pipeline: transcode, posters, variants, hashing, route-aware prefetch.
-5. Video export: narration from notes, timing from the route.
+5. Video export: narration from notes, timing from the route. Playwright's bundled
+   Chromium can't decode H.264, so capture needs WebM clips, or Chrome itself.
 6. Tilt the lens: perspective camera and 2.5D trails.
 
 ## Prior art

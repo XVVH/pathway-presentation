@@ -9,7 +9,7 @@
         },
         {
           "title": "Decks are corridors",
-          "ratio": 0.5281
+          "ratio": 0.5273
         },
         {
           "title": "Prezi had the camera",
@@ -25,7 +25,7 @@
         },
         {
           "title": "A map and a route",
-          "ratio": 0.3703
+          "ratio": 0.3695
         },
         {
           "title": "The map is computed",
@@ -45,15 +45,15 @@
         },
         {
           "title": "Explore is the map without a route",
-          "ratio": 0.4641
+          "ratio": 0.4633
         },
         {
           "title": "How it moves",
-          "ratio": 0.5406
+          "ratio": 0.5391
         },
         {
           "title": "Follow the trail",
-          "ratio": 0.5086
+          "ratio": 0.5078
         },
         {
           "title": "Remote mode",
@@ -61,7 +61,7 @@
         },
         {
           "title": "How it's written",
-          "ratio": 0.5766
+          "ratio": 0.5758
         },
         {
           "title": "Notes stay private",
@@ -73,7 +73,7 @@
         },
         {
           "title": "Video from the same clock",
-          "ratio": 0.5102
+          "ratio": 0.5094
         },
         {
           "title": "Tilt the camera",
@@ -87,7 +87,7 @@
         },
         {
           "title": "Decks are corridors",
-          "ratio": 0.5281
+          "ratio": 0.5273
         },
         {
           "title": "Prezi had the camera",
@@ -103,7 +103,7 @@
         },
         {
           "title": "A map and a route",
-          "ratio": 0.3703
+          "ratio": 0.3695
         },
         {
           "title": "The map is computed",
@@ -123,15 +123,15 @@
         },
         {
           "title": "Explore is the map without a route",
-          "ratio": 0.4641
+          "ratio": 0.4633
         },
         {
           "title": "How it moves",
-          "ratio": 0.5406
+          "ratio": 0.5391
         },
         {
           "title": "Follow the trail",
-          "ratio": 0.5086
+          "ratio": 0.5078
         },
         {
           "title": "Remote mode",
@@ -139,7 +139,7 @@
         },
         {
           "title": "How it's written",
-          "ratio": 0.5766
+          "ratio": 0.5758
         },
         {
           "title": "Notes stay private",
@@ -151,7 +151,7 @@
         },
         {
           "title": "Video from the same clock",
-          "ratio": 0.6234
+          "ratio": 0.6227
         },
         {
           "title": "Tilt the camera",
@@ -166,31 +166,31 @@
       "sectional": [
         {
           "title": "Calibration",
-          "ratio": 0.5625
+          "ratio": 0.5617
         },
         {
           "title": "A long paragraph near the limit",
-          "ratio": 0.7195
+          "ratio": 0.7188
         },
         {
           "title": "A title long enough to wrap onto a second line at reading size",
-          "ratio": 0.5313
+          "ratio": 0.5305
         },
         {
           "title": "Bullets with lead-ins",
-          "ratio": 0.9508
+          "ratio": 0.9492
         },
         {
           "title": "Code with long lines",
-          "ratio": 0.6094
+          "ratio": 0.6078
         },
         {
           "title": "Side image",
-          "ratio": 0.6734
+          "ratio": 0.6727
         },
         {
           "title": "Side video with a caption",
-          "ratio": 0.5102
+          "ratio": 0.5094
         },
         {
           "title": "A deeper stop",
@@ -198,45 +198,45 @@
         },
         {
           "title": "An overflowing stop",
-          "ratio": 0.9508
+          "ratio": 0.9492
         },
         {
           "title": "Wide image with text",
-          "ratio": 0.5867
+          "ratio": 0.5852
         },
         {
           "title": "Several short paragraphs",
-          "ratio": 0.5086
+          "ratio": 0.5078
         }
       ],
       "boardroom": [
         {
           "title": "Calibration",
-          "ratio": 0.5625
+          "ratio": 0.5617
         },
         {
           "title": "A long paragraph near the limit",
-          "ratio": 0.7867
+          "ratio": 0.7859
         },
         {
           "title": "A title long enough to wrap onto a second line at reading size",
-          "ratio": 0.5773
+          "ratio": 0.5766
         },
         {
           "title": "Bullets with lead-ins",
-          "ratio": 0.9508
+          "ratio": 0.9492
         },
         {
           "title": "Code with long lines",
-          "ratio": 0.6094
+          "ratio": 0.6078
         },
         {
           "title": "Side image",
-          "ratio": 0.6734
+          "ratio": 0.6727
         },
         {
           "title": "Side video with a caption",
-          "ratio": 0.5773
+          "ratio": 0.5766
         },
         {
           "title": "A deeper stop",
@@ -244,15 +244,104 @@
         },
         {
           "title": "An overflowing stop",
-          "ratio": 0.9969
+          "ratio": 0.9953
         },
         {
           "title": "Wide image with text",
-          "ratio": 0.5867
+          "ratio": 0.5852
         },
         {
           "title": "Several short paragraphs",
-          "ratio": 0.5086
+          "ratio": 0.5078
+        }
+      ]
+    }
+  },
+  {
+    "deck": "test/fixtures/kitchen/kitchen.md",
+    "measured": {
+      "sectional": [
+        {
+          "title": "Kitchen sink",
+          "ratio": 0.4906
+        },
+        {
+          "title": "Quotes are set apart",
+          "ratio": 0.4156
+        },
+        {
+          "title": "Two quoted paragraphs",
+          "ratio": 0.4156
+        },
+        {
+          "title": "Tables line up",
+          "ratio": 0.4883
+        },
+        {
+          "title": "Numbered steps",
+          "ratio": 0.4352
+        },
+        {
+          "title": "Nested points",
+          "ratio": 0.4945
+        },
+        {
+          "title": "Rules divide",
+          "ratio": 0.3914
+        },
+        {
+          "title": "Technical detail",
+          "ratio": 0.6469
+        },
+        {
+          "title": "Pictures sit beside or below",
+          "ratio": 0.493
+        },
+        {
+          "title": "Missing media shows a placeholder",
+          "ratio": 0.3922
+        }
+      ],
+      "boardroom": [
+        {
+          "title": "Kitchen sink",
+          "ratio": 0.6531
+        },
+        {
+          "title": "Quotes are set apart",
+          "ratio": 0.4156
+        },
+        {
+          "title": "Two quoted paragraphs",
+          "ratio": 0.4156
+        },
+        {
+          "title": "Tables line up",
+          "ratio": 0.4883
+        },
+        {
+          "title": "Numbered steps",
+          "ratio": 0.4352
+        },
+        {
+          "title": "Nested points",
+          "ratio": 0.4945
+        },
+        {
+          "title": "Rules divide",
+          "ratio": 0.3914
+        },
+        {
+          "title": "Technical detail",
+          "ratio": 0.6469
+        },
+        {
+          "title": "Pictures sit beside or below",
+          "ratio": 0.493
+        },
+        {
+          "title": "Missing media shows a placeholder",
+          "ratio": 0.4594
         }
       ]
     }

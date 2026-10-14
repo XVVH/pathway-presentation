@@ -15,7 +15,7 @@ function loadPlaywright() {
   try { return require("playwright"); } catch { return require(resolve(execSync("npm root -g").toString().trim(), "playwright")); }
 }
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const fonts = resolve(root, "spike/media/fonts");
+const fonts = resolve(root, "skins/fonts");
 const FACES = {
   barlow400: ["Barlow", 400, "barlow-latin-400-normal.woff2"],
   barlow600: ["Barlow", 600, "barlow-latin-600-normal.woff2"],
@@ -25,13 +25,13 @@ const FACES = {
   plexMono400: ["IBM Plex Mono", 400, "ibm-plex-mono-latin-400-normal.woff2"],
 };
 const css = Object.values(FACES).map(([family, weight, file]) =>
-  `@font-face { font-family: "${family}"; font-weight: ${weight}; src: url("media/fonts/${file}") format("woff2"); }`).join("\n");
+  `@font-face { font-family: "${family}"; font-weight: ${weight}; src: url("fonts/${file}") format("woff2"); }`).join("\n");
 
 const { chromium } = loadPlaywright();
 const browser = await chromium.launch();
 const page = await browser.newPage();
 // Fonts load only from a file page in the same tree, so write a scratch page next to them.
-const scratch = resolve(fonts, "../../.measure-fonts.html");
+const scratch = resolve(fonts, "../.measure-fonts.html");
 writeFileSync(scratch, `<!doctype html><style>${css}</style>${Object.values(FACES).map(([f, w]) => `<span style="font: ${w} 20px '${f}'">x</span>`).join("")}`);
 await page.goto(pathToFileURL(scratch).href);
 await page.evaluate(() => document.fonts.ready);

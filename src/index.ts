@@ -1,4 +1,4 @@
-// Library entry point: parse and check decks from code.
+// Library entry point: parse, check and compile decks from code.
 
 export { checkDeck, type CheckOptions, type CheckResult, type Summary } from "./check.ts";
 export { estimateStop, type Estimate } from "./layout.ts";
@@ -8,3 +8,6 @@ export { parseNotes, defaultNotesPath } from "./notes.ts";
 export { parseDeck } from "./parse.ts";
 export { defaultRoute, type RouteStop } from "./routes.ts";
 export { CARD, DENSITY, SKINS, TYPE, type Density } from "./typography.ts";
+export { compileDeck, type Compiled, type CompileOptions } from "./compile.ts";
+export { formatDeck } from "./fmt.ts";
+export type * from "./payload.ts";

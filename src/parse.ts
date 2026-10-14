@@ -5,7 +5,7 @@
 import type { Token } from "markdown-it";
 import { parseAttrs, splitTrailingAttrs } from "./attrs.ts";
 import { readFrontmatter } from "./frontmatter.ts";
-import { createMarkdown, runsOf, runsText } from "./markdown.ts";
+import { createMarkdown, figureParts, runsOf, runsText } from "./markdown.ts";
 import { mediaKind, isRemote } from "./media.ts";
 import type { Block, Deck, Diagnostic, ListItem, MediaRef, Stop, WikiLink } from "./model.ts";
 import { closest, countWords, slugify } from "./text.ts";
@@ -202,7 +202,7 @@ function addBlock(stop: Stop, slice: Token[], file: string, diag: (d: Omit<Diagn
       const runs = inlines.flatMap((t, k) => (k ? [{ text: " ", style: "normal" as const }, ...runsOf(t.children)] : runsOf(t.children)));
       const text = runsText(runs);
       for (const inl of inlines) collectInlineMedia(inl, stop, diag);
-      block = { kind: "quote", line, endLine, runs, text, words: countWords(text) };
+      block = { kind: "quote", line, endLine, runs, text, words: countWords(text), paragraphs: inlines.map(t => runsOf(t.children)) };
       break;
     }
     case "table_open": {
@@ -241,14 +241,12 @@ function mediaRef(img: Token, line: number, inline: boolean): MediaRef {
 
 /** A paragraph holding only an image (and optional {attributes}) is a figure. */
 function mediaParagraph(inl: Token, stop: Stop, diag: (d: Omit<Diagnostic, "file">) => void): MediaRef | null {
-  const kids = (inl.children ?? []).filter(c => !(c.type === "softbreak" || (c.type === "text" && !c.content.trim())));
-  if (!kids.length || kids[0].type !== "image") return null;
-  const after = kids.slice(1);
-  if (after.length > 1 || (after.length === 1 && !(after[0].type === "text" && /^\s*\{[^{}]*\}\s*$/.test(after[0].content)))) return null;
+  const parts = figureParts(inl);
+  if (!parts) return null;
   const line = lineOf(inl);
-  const ref = mediaRef(kids[0], line, false);
-  if (after.length) {
-    const attrs = parseAttrs(after[0].content.trim().slice(1, -1));
+  const ref = mediaRef(parts.image, line, false);
+  if (parts.attrs !== null) {
+    const attrs = parseAttrs(parts.attrs);
     for (const e of attrs.errors) diag({ code: "bad-attribute", severity: "error", line, stop: stop.id, message: `In this media's {…}: ${e}.` });
     for (const c of attrs.classes) if (!MEDIA_CLASSES.includes(c)) diag({ code: "unknown-attribute", severity: "warning", line, stop: stop.id, message: `Unknown class '.${c}' on media. Known: ${MEDIA_CLASSES.map(x => `.${x}`).join(", ")}.` });
     for (const k of Object.keys(attrs.kv)) if (!MEDIA_KEYS.includes(k)) diag({ code: "unknown-attribute", severity: "warning", line, stop: stop.id, message: `Unknown attribute '${k}' on media. Known: ${MEDIA_KEYS.join(", ")}.` });

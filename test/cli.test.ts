@@ -85,3 +85,33 @@ test("usage errors exit 2", () => {
   assert.equal(run("--help").code, 0);
   assert.match(run("--version").out, /^\d+\.\d+\.\d+\n$/);
 });
+
+test("build: refuses a broken deck, builds a clean one, and says where", () => {
+  const dir = scratch({ "deck.md": "# T\n\n## A\nSee [[nowhere]].\n" });
+  const broken = run("build", join(dir, "deck.md"));
+  assert.equal(broken.code, 1);
+  assert.match(broken.err, /Not built: the deck has errors/);
+  writeFileSync(join(dir, "deck.md"), "# T\n\n## A\nFine.\n");
+  const ok = run("build", join(dir, "deck.md"));
+  assert.equal(ok.code, 0);
+  assert.match(ok.out, /Built .*deck-build\/index\.html \(0 media files\)/);
+  assert.match(readFileSync(join(dir, "deck-build", "index.html"), "utf8"), /<title>T<\/title>/);
+  const notes = run("build", join(dir, "deck.md"), "--with-notes");
+  assert.match(notes.err, /Speaker notes are included/);
+});
+
+test("fmt: prints, checks or rewrites", () => {
+  const dir = scratch({ "deck.md": "# T\n## A   \nx\n\n\n" });
+  assert.equal(run("fmt", join(dir, "deck.md")).out, "# T\n\n## A\nx\n");
+  assert.equal(run("fmt", "--check", join(dir, "deck.md")).code, 1);
+  assert.equal(run("fmt", "--write", join(dir, "deck.md")).code, 0);
+  assert.equal(readFileSync(join(dir, "deck.md"), "utf8"), "# T\n\n## A\nx\n");
+  assert.equal(run("fmt", "--check", join(dir, "deck.md")).code, 0);
+  assert.equal(run("fmt", "--check", "--write", join(dir, "deck.md")).code, 2);
+});
+
+test("render and present explain their options", () => {
+  assert.equal(run("render", "examples/pathway/pathway.md").code, 2);
+  assert.equal(run("render", "examples/pathway/pathway.md", "--map", "--size", "big").code, 2);
+  assert.equal(run("present", "examples/pathway/pathway.md", "--port", "99999").code, 2);
+});

@@ -19,6 +19,8 @@ export const CARD = {
   ratioMax: 0.8,
   /** The reference width cards are measured at, in px. Type scales with the card. */
   referenceWidth: 1280,
+  /** The card's border, in px: it doesn't scale, so it counts at the reference width. */
+  border: 1,
 } as const;
 
 export const TYPE = {

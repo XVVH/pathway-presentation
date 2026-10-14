@@ -5,11 +5,11 @@ talk is a route through it.
 
 - [DESIGN.md](DESIGN.md): the idea, the decisions so far, and the build plan.
 - [AGENTS.md](AGENTS.md): how to write a deck, for agents and people.
-- [spike/](spike/): the motion prototype. Open `spike/index.html` in a browser and
-  press →.
+- [spike/](spike/): the motion prototype the engine grew from. Open
+  `spike/index.html` in a browser and press →.
 - [examples/pathway/](examples/pathway/): a deck about Pathway, with speaker notes.
 
-## Checking a deck
+## Using it
 
 Needs Node 22.18 or later. Pathway runs its TypeScript directly, with no build
 step.
@@ -17,25 +17,36 @@ step.
 ```sh
 npm install
 node src/cli.ts check examples/pathway/pathway.md     # problems, with lines and fixes
+node src/cli.ts present examples/pathway/pathway.md   # present from this machine, with notes
+node src/cli.ts build examples/pathway/pathway.md     # a folder to present from anywhere
 node src/cli.ts outline examples/pathway/pathway.md   # the map as a tree, and the route
-node src/cli.ts check deck.md --json                  # for agents and scripts
+node src/cli.ts fmt --write examples/pathway/pathway.md
+node src/cli.ts render examples/pathway/pathway.md --all   # PNGs (needs Playwright)
 ```
 
-`check` exits with 1 when the deck has errors (or warnings, with `--strict`).
-`--fix` applies the fixes it marks safe.
+- `check` exits with 1 when the deck has errors (or warnings, with `--strict`).
+  `--fix` applies the fixes it marks safe; `--json` is for agents and scripts.
+- `present` serves on 127.0.0.1 and reloads as you edit. Press P in the browser for
+  the presenter window: notes, timer, what's next, the detours within reach.
+- `build` writes `<deck>-build/`. Its `index.html` opens from disk, offline, and
+  can't reach the network. Speaker notes are left out unless you pass
+  `--with-notes`.
 
 ## Development
 
 ```sh
-npm test            # all tests
+npm test               # unit tests, no browser needed
 npm run typecheck
-npm run build       # optional: emit plain JavaScript to dist/ for older Node
+npm run bundle         # rebuild runtime/pathway.js after changing src/runtime/
+npm run e2e            # drive a built deck in Chromium (needs Playwright)
+npm run build          # optional: emit plain JavaScript to dist/ for older Node
 ```
 
+- **The engine** lives in `src/runtime/` and is bundled into `runtime/pathway.js`,
+  which is committed so building a deck needs no bundler. CI fails if it's stale.
 - **Size estimates.** The checker estimates card heights from measured font
-  widths. Tests hold it to real browser measurements stored in
-  `test/calibration.json`. After changing fonts or the type scale in
-  `src/typography.ts`, refresh it with
-  `node scripts/measure-fonts.mjs` and
-  `node scripts/calibrate.mjs examples/pathway/pathway.md test/fixtures/calibration/calibration.md --write test/calibration.json`.
-  Both scripts need Playwright.
+  widths. Tests hold it to measurements of real cards stored in
+  `test/calibration.json`. After changing fonts, the type scale in
+  `src/typography.ts` or the card CSS, refresh it with
+  `node scripts/measure-fonts.mjs` (fonts only) and
+  `npm run calibrate -- --write test/calibration.json`. Both need Playwright.

@@ -93,11 +93,16 @@ export function estimateStop(stop: Stop, o: EstimateOptions): Estimate {
   blocks.forEach((b, i) => {
     const last = i === blocks.length - 1;
     let top = 0, h = 0, bottom = 0;
-    if (b.kind === "paragraph" || b.kind === "quote") {
-      const size = o.isRoot && i === 0 && b.kind === "paragraph" ? TYPE.rootLede.size : d.body;
-      const indent = b.kind === "quote" ? d.listIndentEm * size : 0;
-      h = wrapLines(b.runs, (colW - indent) / size, faces) * size * d.lineHeight;
+    if (b.kind === "paragraph") {
+      const size = o.isRoot && i === 0 ? TYPE.rootLede.size : d.body;
+      h = wrapLines(b.runs, colW / size, faces) * size * d.lineHeight;
       bottom = last ? 0 : d.paragraphGapEm * size;
+    } else if (b.kind === "quote") {
+      // Indented by the list indent; its paragraphs are spaced like any others.
+      const paras = b.paragraphs.length ? b.paragraphs : [b.runs];
+      const lines = paras.reduce((a, runs) => a + Math.max(1, wrapLines(runs, (colW - d.listIndentEm * d.body) / d.body, faces)), 0);
+      h = lines * d.body * d.lineHeight + (paras.length - 1) * d.paragraphGapEm * d.body;
+      bottom = last ? 0 : d.paragraphGapEm * d.body;
     } else if (b.kind === "list") {
       for (const item of b.items) {
         const indent = d.listIndentEm * d.body * (item.depth + 1);
@@ -138,7 +143,7 @@ export function estimateStop(stop: Stop, o: EstimateOptions): Estimate {
   if (side) content = Math.max(col, figures.reduce((a, m) => a + figureHeight(m, colW), 0));
   else if (wide) content = col + figures.reduce((a, m) => a + TYPE.wideMedia.marginTop + figureHeight(m, contentW), 0);
 
-  const ratio = (CARD.padTop + CARD.padBottom + content) / 100;
+  const ratio = (CARD.padTop + CARD.padBottom + content) / 100 + (2 * CARD.border) / CARD.referenceWidth;
   const fitted = Math.min(CARD.ratioMax, Math.max(CARD.ratioMin, Math.ceil(ratio / CARD.ratioStep - 1e-3) * CARD.ratioStep));
   const overflow = ratio > CARD.ratioMax + 1e-9;
   const overflowLines = overflow ? Math.ceil(((ratio - CARD.ratioMax) * 100) / (d.body * d.lineHeight)) : 0;
