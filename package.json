@@ -1,0 +1,29 @@
+{
+  "name": "pathway",
+  "version": "0.1.0",
+  "description": "Talks as landscapes: presentations where the content is a map and the talk is a route through it.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "bin": {
+    "pathway": "./bin/pathway.js"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "pathway": "node src/cli.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "check:example": "node src/cli.ts check examples/pathway/pathway.md"
+  },
+  "dependencies": {
+    "markdown-it": "15.0.2",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "6.0.3"
+  }
+}

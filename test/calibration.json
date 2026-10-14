@@ -1,0 +1,260 @@
+[
+  {
+    "deck": "examples/pathway/pathway.md",
+    "measured": {
+      "sectional": [
+        {
+          "title": "Pathway",
+          "ratio": 0.432
+        },
+        {
+          "title": "Decks are corridors",
+          "ratio": 0.5281
+        },
+        {
+          "title": "Prezi had the camera",
+          "ratio": 0.35
+        },
+        {
+          "title": "impress.js had the browser",
+          "ratio": 0.3961
+        },
+        {
+          "title": "PowerPoint had the return",
+          "ratio": 0.3555
+        },
+        {
+          "title": "A map and a route",
+          "ratio": 0.3703
+        },
+        {
+          "title": "The map is computed",
+          "ratio": 0.3961
+        },
+        {
+          "title": "The route is reading order",
+          "ratio": 0.35
+        },
+        {
+          "title": "Detours wait off the route",
+          "ratio": 0.35
+        },
+        {
+          "title": "One map, many routes",
+          "ratio": 0.3555
+        },
+        {
+          "title": "Explore is the map without a route",
+          "ratio": 0.4641
+        },
+        {
+          "title": "How it moves",
+          "ratio": 0.5406
+        },
+        {
+          "title": "Follow the trail",
+          "ratio": 0.5086
+        },
+        {
+          "title": "Remote mode",
+          "ratio": 0.35
+        },
+        {
+          "title": "How it's written",
+          "ratio": 0.5766
+        },
+        {
+          "title": "Notes stay private",
+          "ratio": 0.3555
+        },
+        {
+          "title": "Where it goes",
+          "ratio": 0.3039
+        },
+        {
+          "title": "Video from the same clock",
+          "ratio": 0.5102
+        },
+        {
+          "title": "Tilt the camera",
+          "ratio": 0.35
+        }
+      ],
+      "boardroom": [
+        {
+          "title": "Pathway",
+          "ratio": 0.432
+        },
+        {
+          "title": "Decks are corridors",
+          "ratio": 0.5281
+        },
+        {
+          "title": "Prezi had the camera",
+          "ratio": 0.35
+        },
+        {
+          "title": "impress.js had the browser",
+          "ratio": 0.3961
+        },
+        {
+          "title": "PowerPoint had the return",
+          "ratio": 0.3555
+        },
+        {
+          "title": "A map and a route",
+          "ratio": 0.3703
+        },
+        {
+          "title": "The map is computed",
+          "ratio": 0.3961
+        },
+        {
+          "title": "The route is reading order",
+          "ratio": 0.35
+        },
+        {
+          "title": "Detours wait off the route",
+          "ratio": 0.35
+        },
+        {
+          "title": "One map, many routes",
+          "ratio": 0.3555
+        },
+        {
+          "title": "Explore is the map without a route",
+          "ratio": 0.4641
+        },
+        {
+          "title": "How it moves",
+          "ratio": 0.5406
+        },
+        {
+          "title": "Follow the trail",
+          "ratio": 0.5086
+        },
+        {
+          "title": "Remote mode",
+          "ratio": 0.3961
+        },
+        {
+          "title": "How it's written",
+          "ratio": 0.5766
+        },
+        {
+          "title": "Notes stay private",
+          "ratio": 0.3555
+        },
+        {
+          "title": "Where it goes",
+          "ratio": 0.3039
+        },
+        {
+          "title": "Video from the same clock",
+          "ratio": 0.6234
+        },
+        {
+          "title": "Tilt the camera",
+          "ratio": 0.35
+        }
+      ]
+    }
+  },
+  {
+    "deck": "test/fixtures/calibration/calibration.md",
+    "measured": {
+      "sectional": [
+        {
+          "title": "Calibration",
+          "ratio": 0.5625
+        },
+        {
+          "title": "A long paragraph near the limit",
+          "ratio": 0.7195
+        },
+        {
+          "title": "A title long enough to wrap onto a second line at reading size",
+          "ratio": 0.5313
+        },
+        {
+          "title": "Bullets with lead-ins",
+          "ratio": 0.9508
+        },
+        {
+          "title": "Code with long lines",
+          "ratio": 0.6094
+        },
+        {
+          "title": "Side image",
+          "ratio": 0.6734
+        },
+        {
+          "title": "Side video with a caption",
+          "ratio": 0.5102
+        },
+        {
+          "title": "A deeper stop",
+          "ratio": 0.35
+        },
+        {
+          "title": "An overflowing stop",
+          "ratio": 0.9508
+        },
+        {
+          "title": "Wide image with text",
+          "ratio": 0.5867
+        },
+        {
+          "title": "Several short paragraphs",
+          "ratio": 0.5086
+        }
+      ],
+      "boardroom": [
+        {
+          "title": "Calibration",
+          "ratio": 0.5625
+        },
+        {
+          "title": "A long paragraph near the limit",
+          "ratio": 0.7867
+        },
+        {
+          "title": "A title long enough to wrap onto a second line at reading size",
+          "ratio": 0.5773
+        },
+        {
+          "title": "Bullets with lead-ins",
+          "ratio": 0.9508
+        },
+        {
+          "title": "Code with long lines",
+          "ratio": 0.6094
+        },
+        {
+          "title": "Side image",
+          "ratio": 0.6734
+        },
+        {
+          "title": "Side video with a caption",
+          "ratio": 0.5773
+        },
+        {
+          "title": "A deeper stop",
+          "ratio": 0.35
+        },
+        {
+          "title": "An overflowing stop",
+          "ratio": 0.9969
+        },
+        {
+          "title": "Wide image with text",
+          "ratio": 0.5867
+        },
+        {
+          "title": "Several short paragraphs",
+          "ratio": 0.5086
+        }
+      ]
+    }
+  }
+]

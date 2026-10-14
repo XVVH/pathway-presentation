@@ -262,9 +262,20 @@ skipped by the route and one key away for the audience that wants it.
 
 ### 11. Built for agents
 
-- `pathway check` returns structural, reference and narrative diagnostics as JSON:
-  broken links, missing media, notes drift, routes naming missing stops, depth beyond
-  3, and too many words for one stop.
+- `pathway check` reports 42 kinds of problem, with line numbers, as text or JSON:
+  structure, links, media, routes, notes drift, depth, and density. Each comes with a
+  fix where there is one. Fixes are line edits, and the safe ones apply with `--fix`.
+  For crowded stops with bold-led bullets, the fix includes the exact edits to turn
+  them into child stops.
+- **The size check needs no browser.** It wraps text word by word using advance
+  widths measured from the skins' real fonts (`src/metrics.ts`). Tests hold it to
+  real browser measurements of 60 cards in both skins, including deliberately
+  overflowing ones. It agrees within 0.003 of card width on nearly every card,
+  under a tenth of a line. On the longest paragraphs it runs about one line high,
+  so it errs toward flagging.
+- `src/typography.ts` is the single source of truth for the type scale. The checker
+  estimates from it, and the renderer must set cards from it. Two parts of the
+  contract aren't in the prototype yet: block quotes and tables.
 - `pathway render --stop <id>` writes a PNG, so a vision model can critique density
   and layout.
 - `AGENTS.md` describes the format in a page. Since the format invents nothing, it
@@ -350,8 +361,11 @@ From the first review:
 
 ## Build plan
 
-0. ~~Motion prototype~~ (this commit). Review the feel, then tune.
-1. Format: parser, `check` with JSON diagnostics, `fmt`, `AGENTS.md`.
+0. ~~Motion prototype~~ (`spike/`). Reviewed and tuned: landscape, ramped trail
+   flights, greek in place, fitted cards, strip map.
+1. ~~Format~~: the parser, `pathway check` with JSON diagnostics and safe fixes,
+   `pathway outline`, `AGENTS.md`. `fmt` and `render --stop` are deferred to step 2,
+   which brings the renderer they need.
 2. Present mode: the engine from the prototype as a typed module, a presenter window
    with notes, timer and the detours available here, and named routes.
 3. Explore and handoff: the phone layout, QR on the final view, takeaways.
