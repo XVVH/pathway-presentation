@@ -1654,10 +1654,17 @@
         const url = `${location.href.split(/[?#]/)[0]}?presenter=${token}`;
         const w = window.open(url, `pathway-presenter-${hash(payload.title)}`, "popup,width=1180,height=760");
         if (w) win = w;
-        else flash("The presenter window was blocked. Allow pop-ups for this page, then press P again.");
+        else flash(framed() ? "The presenter window can't open while this deck is shown inside another page. Open the deck in its own browser tab." : "The presenter window was blocked. Allow pop-ups for this page, then press P again.");
       }
       return { send, open };
     })();
+    function framed() {
+      try {
+        return window.self !== window.top;
+      } catch {
+        return true;
+      }
+    }
     function command(c) {
       if (blank && c.cmd !== "blank") setBlank(false);
       switch (c.cmd) {
