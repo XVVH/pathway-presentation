@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pathway Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one full-bleed stage. A canvas draws the ground and the trails; cards and
+   map labels are DOM layers the camera positions every frame; the HUD floats above. */
+@font-face { font-family: "Barlow"; src: url("media/fonts/barlow-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("media/fonts/barlow-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("media/fonts/barlow-condensed-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("media/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("media/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Sans"; src: url("media/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("media/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("media/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+
+/* Skin "Sectional": an aeronautical chart. Pale chart paper, tan contours,
+   and the route drawn as the magenta line pilots follow. */
+:root {
+  --ground: #EDF0EA;
+  --contour: #C9BBA3;
+  --contour-major: #B09C7E;
+  --trail: #8E98A7;
+  --route: #B3127C;
+  --card: #FCFCFA;
+  --rule: #D5DACF;
+  --ink: #1A2130;
+  --ink-2: #566071;
+  --code-bg: #EFF2EB;
+  --shadow: rgba(26, 33, 48, 0.16);
+  --hud-bg: rgba(237, 240, 234, 0.86);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --display-case: uppercase;
+  --terrain: contours;
+  --flight-speed: 1;
+  --flight-max: 2.6;
+  --flight-rho: 1.414;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0E1420; --contour: #1F2B40; --contour-major: #2B3B57; --trail: #55627A;
+    --route: #F0489F; --card: #151D2B; --rule: #253147; --ink: #E5E9F0; --ink-2: #97A2B4;
+    --code-bg: #101725; --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(14, 20, 32, 0.84);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0E1420; --contour: #1F2B40; --contour-major: #2B3B57; --trail: #55627A;
+  --route: #F0489F; --card: #151D2B; --rule: #253147; --ink: #E5E9F0; --ink-2: #97A2B4;
+  --code-bg: #101725; --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(14, 20, 32, 0.84);
+  color-scheme: dark;
+}
+/* Skin "Boardroom": the same deck in a restrained corporate look. Dot grid,
+   one brand blue, quicker and flatter camera moves. */
+:root[data-skin="boardroom"] {
+  --ground: #F3F5F8; --contour: #CDD4DF; --contour-major: #B9C2D0; --trail: #A6B0BF;
+  --route: #1C5BD9; --card: #FFFFFF; --rule: #DCE1E8; --ink: #0E1726; --ink-2: #4E5A6C;
+  --code-bg: #F2F4F7; --shadow: rgba(14, 23, 38, 0.10); --hud-bg: rgba(243, 245, 248, 0.88);
+  --font-display: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --display-case: none;
+  --terrain: dots; --flight-speed: 1.35; --flight-max: 1.5; --flight-rho: 1.15;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="boardroom"]:not([data-theme="light"]) {
+    --ground: #0B0F16; --contour: #1A2230; --contour-major: #243042; --trail: #4A5568;
+    --route: #5B8DFF; --card: #121924; --rule: #222C3B; --ink: #E8ECF2; --ink-2: #9AA5B6;
+    --code-bg: #0E141D; --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(11, 15, 22, 0.86);
+  }
+}
+:root[data-skin="boardroom"][data-theme="dark"] {
+  --ground: #0B0F16; --contour: #1A2230; --contour-major: #243042; --trail: #4A5568;
+  --route: #5B8DFF; --card: #121924; --rule: #222C3B; --ink: #E8ECF2; --ink-2: #9AA5B6;
+  --code-bg: #0E141D; --shadow: rgba(0, 0, 0, 0.5); --hud-bg: rgba(11, 15, 22, 0.86);
+}
+
+html, body { height: 100%; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-body); overflow: hidden; }
+#stage { position: relative; height: 100%; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; outline: none; }
+#stage.dragging { cursor: grabbing; }
+#ground { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#world, #labels { position: absolute; inset: 0; pointer-events: none; }
+
+/* Cards: each is laid out at reading size, then scaled by the camera.
+   At a stop the scale is exactly 1, so text is always crisp where it is read. */
+.card {
+  position: absolute; left: 0; top: 0; width: var(--cw); height: var(--ch);
+  transform-origin: 0 0; container-type: size; visibility: hidden;
+  background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+  box-shadow: 0 18px 50px -24px var(--shadow), 0 2px 6px -2px var(--shadow);
+  overflow: hidden;
+}
+.remote .card { box-shadow: none; }
+.card.detour { border-style: dashed; border-color: var(--trail); }
+.card .inner {
+  position: absolute; inset: 0; padding: 6cqw 6.5cqw;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto;
+  align-content: center; column-gap: 4.5cqw;
+}
+.card.has-media:not(.wide-media) .inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto; }
+.card.has-media:not(.wide-media) figure { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+.card.wide-media figure { grid-row: 4; }
+.eyebrow {
+  display: flex; gap: 1.6cqw; align-items: baseline;
+  font: 500 1.75cqw/1.2 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2);
+  margin-bottom: 2.2cqw;
+}
+.eyebrow .num { color: var(--route); }
+.eyebrow .tag { border: 1px dashed currentColor; padding: 0.2cqw 0.7cqw; border-radius: 0.5cqw; }
+.card h1, .card h2 {
+  margin: 0 0 2.6cqw; font-family: var(--font-display); font-weight: 600; text-wrap: balance;
+  text-transform: var(--display-case); letter-spacing: 0.01em; line-height: 1.02; color: var(--ink);
+}
+.card h2 { font-size: 6.6cqw; }
+.card.root h1 { font-size: 16cqw; letter-spacing: 0.02em; margin-bottom: 3cqw; }
+.card.root .md p:first-child { font-size: 4.2cqw; color: var(--ink); }
+.md { min-width: 0; }
+.card .md p, .card .md li { font-size: 3.3cqw; }
+.md p, .md li { line-height: 1.4; color: var(--ink-2); max-width: 46em; }
+.md p { margin: 0 0 0.6em; }
+.md > :last-child { margin-bottom: 0; }
+.md p:first-child { color: var(--ink); }
+.md ul { margin: 0; padding-left: 1.2em; }
+.md li { margin-bottom: 0.4em; }
+.md li::marker { color: var(--route); }
+.md strong { color: var(--ink); font-weight: 600; }
+.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); padding: 0.1em 0.3em; border-radius: 0.25em; }
+.md pre {
+  margin: 0.4em 0 0; padding: 2.2cqw 2.6cqw; background: var(--code-bg); border-radius: 0.8cqw;
+  border: 1px solid var(--rule); font: 2.15cqw/1.5 var(--font-mono); color: var(--ink); white-space: pre; overflow: hidden;
+}
+.md pre code { background: none; padding: 0; font-size: inherit; }
+.md .kw { color: var(--route); }
+figure { margin: 0; min-width: 0; }
+figure img, figure video { display: block; width: 100%; height: auto; border-radius: 0.8cqw; }
+.card figure video { aspect-ratio: 16 / 9; object-fit: cover; background: var(--code-bg); }
+.card.wide-media figure { margin-top: 3cqw; }
+.card.wide-media figure img { max-height: 26cqh; object-fit: contain; }
+figcaption { margin-top: 0.8em; font: 1.6cqw/1.4 var(--font-mono); color: var(--ink-2); letter-spacing: 0.04em; }
+
+/* Map labels: screen-space, fixed size, with a halo, the way a chart labels a town. */
+.label {
+  position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer; white-space: nowrap;
+  font: 600 13px/1.1 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink);
+  text-shadow: 0 0 2px var(--ground), 0 0 3px var(--ground), 0 0 6px var(--ground), 0 0 10px var(--ground);
+  visibility: hidden; padding: 2px 4px;
+}
+.label.detour { color: var(--ink-2); font-weight: 500; }
+.label.detour::after { content: " · detour"; text-transform: none; letter-spacing: 0.02em; }
+
+/* HUD */
+#hud {
+  position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px; gap: 12px;
+}
+.hud-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-width: 0; }
+.pill {
+  background: var(--hud-bg); border: 1px solid var(--rule); border-radius: 8px;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+#crumbs {
+  min-width: 0; padding: 7px 11px; font: 500 12px/1.3 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#crumbs b { color: var(--ink); font-weight: 500; }
+#crumbs .sep { color: var(--route); padding: 0 0.5em; }
+.chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; pointer-events: auto; flex-shrink: 0; }
+button {
+  font: 500 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink); cursor: pointer;
+  background: var(--hud-bg); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+button:hover { border-color: var(--trail); }
+button:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
+button .k { color: var(--ink-2); margin-right: 6px; }
+.hud-bottom { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; }
+#minimap { width: 184px; height: 104px; display: block; pointer-events: auto; cursor: crosshair; border-radius: 8px; }
+#status { padding: 8px 14px; text-align: center; font: 500 12px/1.5 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); max-width: min(560px, 60vw); }
+#status .now { color: var(--ink); }
+#status .detour-hint { color: var(--route); }
+#status .hint { text-transform: none; letter-spacing: 0.02em; }
+.nav { justify-self: end; display: flex; gap: 6px; pointer-events: auto; }
+.nav button { width: 42px; height: 42px; padding: 0; font-size: 16px; border-radius: 10px; }
+#scrub { display: none; align-items: center; gap: 10px; padding: 6px 10px; pointer-events: auto; font: 500 12px var(--font-mono); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+#scrub input { width: min(420px, 46vw); accent-color: var(--route); }
+.touring #scrub { display: flex; }
+.touring #status { display: none; }
+#help {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100% - 32px));
+  padding: 20px 22px; pointer-events: auto; font: 13px/1.5 var(--font-body); color: var(--ink); box-shadow: 0 20px 60px -20px var(--shadow);
+}
+#help h3 { margin: 0 0 10px; font: 600 15px/1.2 var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
+#help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
+#help dt { font: 500 12px/1.6 var(--font-mono); color: var(--route); white-space: nowrap; }
+#help dd { margin: 0; color: var(--ink-2); }
+#help p { margin: 12px 0 0; color: var(--ink-2); font-size: 12px; }
+#sheet { display: none; }
+.capture #hud .chips, .capture #hud .nav, .capture #status, .capture #scrub, .capture #help { display: none !important; }
+
+/* Phones: the map stays on top, the stop's text reads in a sheet below, like a maps app. */
+.narrow #minimap, .narrow .chips .wide-only, .narrow #btn-motion, .narrow #status .hint, .narrow #status .detour-hint { display: none; }
+.narrow .hud-bottom { grid-template-columns: minmax(0, 1fr) auto; margin-bottom: var(--sheet-h, 0px); }
+.narrow #status { justify-self: start; text-align: left; max-width: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.narrow #scrub input { width: 40vw; }
+.narrow #sheet {
+  display: block; position: absolute; left: 0; right: 0; bottom: 0; height: var(--sheet-h, 45%); box-sizing: border-box;
+  background: var(--card); border-top: 1px solid var(--rule); border-radius: 16px 16px 0 0; overflow-y: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 28px; pointer-events: auto; touch-action: pan-y; user-select: text; -webkit-user-select: text;
+}
+#sheet h2 { margin: 0 0 10px; font: 600 24px/1.1 var(--font-display); text-transform: var(--display-case); text-wrap: balance; }
+#sheet .eyebrow { font-size: 11px; margin-bottom: 8px; gap: 10px; }
+#sheet .eyebrow .tag { padding: 1px 6px; border-radius: 4px; }
+#sheet .md p, #sheet .md li { font-size: 16px; line-height: 1.5; }
+#sheet .md p { margin: 0 0 10px; }
+#sheet .md li { margin-bottom: 6px; }
+#sheet .md pre { font-size: 12px; padding: 10px 12px; border-radius: 8px; overflow-x: auto; }
+#sheet figure { margin-top: 12px; }
+#sheet figure img, #sheet figure video { border-radius: 8px; }
+#sheet figcaption { font-size: 11px; }
+#sheet .stops { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+#sheet .stops button { width: 100%; text-align: left; border-radius: 8px; padding: 12px; font: 600 15px/1.2 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+#sheet .stops button.detour { color: var(--ink-2); font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+</style>
+</head>
+<body>
+<div id="stage" tabindex="0" aria-label="Pathway map. Use arrow keys to travel.">
+  <canvas id="ground"></canvas>
+  <div id="world"></div>
+  <div id="labels"></div>
+  <div id="hud">
+    <div class="hud-row">
+      <div id="crumbs" class="pill"></div>
+      <div class="chips">
+        <button id="btn-tour" class="wide-only" type="button" title="Play the route as a video (V)"><span class="k">V</span><span>Play tour</span></button>
+        <button id="btn-motion" type="button" title="Motion profile (R)"><span class="k">R</span><span>Cinematic</span></button>
+        <button id="btn-skin" type="button" title="Skin (T)"><span class="k">T</span><span>Sectional</span></button>
+        <button id="btn-help" type="button" title="Keys (?)">?</button>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <canvas id="minimap" class="pill" aria-label="Minimap. Click to fly there."></canvas>
+      <div>
+        <div id="status" class="pill"></div>
+        <div id="scrub" class="pill">
+          <button id="btn-play" type="button" aria-label="Play or pause">❚❚</button>
+          <input id="scrub-range" type="range" min="0" max="1000" value="0" aria-label="Tour position">
+          <span id="scrub-time">0:00 / 0:00</span>
+        </div>
+      </div>
+      <div class="nav">
+        <button id="btn-prev" type="button" aria-label="Previous stop">←</button>
+        <button id="btn-map" type="button" aria-label="Whole map">⌖</button>
+        <button id="btn-next" type="button" aria-label="Next stop">→</button>
+      </div>
+    </div>
+    <div id="help" class="pill" hidden>
+      <h3>Keys</h3>
+      <dl>
+        <dt>→ / space</dt><dd>Next stop. When you have wandered off the route, it rejoins where you left.</dd>
+        <dt>←</dt><dd>Previous stop, or back to where you left the route.</dd>
+        <dt>↓</dt><dd>Take the detour offered at this stop.</dd>
+        <dt>↑</dt><dd>Pull back to the parent's branch.</dd>
+        <dt>M / Esc</dt><dd>The whole map.</dd>
+        <dt>V</dt><dd>Play the route as a video, with a scrubber.</dd>
+        <dt>R</dt><dd>Motion: cinematic or remote (for screen share).</dd>
+        <dt>T</dt><dd>Skin: Sectional or Boardroom.</dd>
+        <dt>Drag, wheel, pinch</dt><dd>Explore freely. Click any station to fly there.</dd>
+      </dl>
+      <p>This prototype tests the motion. The deck source is the Markdown at the bottom of this file.</p>
+    </div>
+  </div>
+  <div id="sheet" aria-live="polite"></div>
+</div>
+
+<!-- The deck. Headings are stations; heading depth is distance from the trunk. -->
+<script type="text/markdown" id="deck">
+---
+title: Pathway
+skin: sectional
+---
+
+# Pathway
+A talk you travel through instead of paging through.
+
+Press → to start. M shows the whole map at any time.
+
+## Decks are corridors {#corridors}
+- A slide deck is one hallway: door after door, in a fixed order.
+- Real ideas branch, nest, and loop back on themselves.
+- The audience never sees the shape of the argument, only the next door.
+
+### Prezi had the camera {#prezi}
+A zoomable canvas in 2009. The motion was decoration, so audiences got seasick and the idea got a reputation.
+
+### impress.js had the browser {#impress}
+Camera moves in plain HTML in 2012, and tools like mdpress fed it Markdown. Every slide still needed a hand-placed x, y, z and rotation.
+
+### PowerPoint had the return {#powerpoint .detour}
+Summary Zoom and a **Return to Zoom** checkbox. Non-linear navigation, locked inside a .pptx file.
+
+## A map and a route {#map}
+The **map** is the content: every idea has a place.
+
+The **route** is the talk: one path through the map.
+
+### The map is computed {#computed}
+There are no coordinates in the source. Main stops run along the trunk. Detail branches off as side trails, smaller and further out.
+
+### The route is reading order {#route}
+Stops follow the file from top to bottom. When a branch ends, the camera pulls back over the trail you just walked.
+
+#### Detours wait off the route {#detours}
+A detour is skipped by the route but stays one key away. Press ↓ when someone asks, then → to rejoin.
+
+#### One map, many routes {#routes .detour}
+A five-minute cut and a forty-five-minute deep dive can share one file. A route is a list of stop names.
+
+### Explore is the map without a route {#explore}
+Drag, zoom, and tap any station. This is what the audience keeps after the talk.
+
+## How it moves {#motion}
+In means detail. Out means context. Across means next. Nothing rotates.
+
+![The motion grammar](media/grammar.svg){.wide}
+
+### Flights rise over common ground {#flights}
+Between two distant stops the camera climbs toward the branch they share, then descends. Every long jump shows how its two ends are related.
+
+Path: van Wijk and Nuij, *Smooth and efficient zooming and panning*, 2003.
+
+### Remote mode {#remote}
+Screen-share encoders drop frames when everything moves at once. Press R for shorter, flatter flights over plain ground.
+
+## How it's written {#format}
+One Markdown file. Headings are stations, and heading depth is distance from the trunk.
+
+```markdown
+## Intake {#intake}
+![Funnel](media/funnel.svg)
+
+### Triage is a queue {.detour}
+Skipped by the route. One key away.
+```
+
+### Notes stay private {#notes .detour}
+Speaker notes live in a sidecar file with matching headings. The build leaves them out unless you ask for them.
+
+## Where it goes {#next}
+Video export, the phone handoff, and depth.
+
+### Video from the same clock {#video}
+Every frame is a function of time, so the tour renders to MP4 by stepping the clock. Embedded clips seek with it.
+
+![An endless zoom, for old times' sake](media/flight.mp4){loop}
+
+### Tilt the camera {#tilt}
+The camera is modeled in 3D with a flat lens. Tilt it, and the trail runs toward a horizon.
+</script>
+
+<script>
+"use strict";
+(() => {
+// ---------------------------------------------------------------- utilities
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const smootherstep = t => t * t * t * (t * (t * 6 - 15) + 10);
+const easeInOutQuad = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const pad2 = n => String(n).padStart(2, "0");
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const fmtTime = s => `${Math.floor(s / 60)}:${pad2(Math.floor(s % 60))}`;
+function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function valueNoise(seed) {
+  const rnd = mulberry32(seed), perm = new Uint8Array(512), vals = new Float32Array(256);
+  for (let i = 0; i < 256; i++) { perm[i] = i; vals[i] = rnd(); }
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+  for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
+  const v = (x, y) => vals[perm[(x & 255) + perm[y & 255]]];
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), w = yf * yf * (3 - 2 * yf);
+    return lerp(lerp(v(xi, yi), v(xi + 1, yi), u), lerp(v(xi, yi + 1), v(xi + 1, yi + 1), u), w);
+  };
+}
+
+// ---------------------------------------------------------------- parser
+// A deliberately tiny Markdown subset: frontmatter, headings with {#id .class key=value},
+// paragraphs, bullet lists, fenced code, and media paragraphs. The real build will use a proper parser.
+function parseAttrs(s) {
+  const out = { id: null, classes: [], kv: {} };
+  for (const tok of (s || "").trim().split(/\s+/).filter(Boolean)) {
+    if (tok[0] === "#") out.id = tok.slice(1);
+    else if (tok[0] === ".") out.classes.push(tok.slice(1));
+    else if (tok.includes("=")) { const [k, v] = tok.split("="); out.kv[k] = v.replace(/^"|"$/g, ""); }
+    else out.kv[tok] = true;
+  }
+  return out;
+}
+function inline(s) {
+  const codes = [];
+  s = s.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
+  s = esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[+i])}</code>`);
+}
+function renderBody(src) {
+  const lines = src.split("\n"), out = [], media = [];
+  let para = [], list = null, words = 0, i = 0;
+  const flushPara = () => { if (para.length) { const t = para.join(" "); words += t.split(/\s+/).length; out.push(`<p>${inline(t)}</p>`); para = []; } };
+  const flushList = () => { if (list) { out.push(`<ul>${list.map(li => `<li>${inline(li)}</li>`).join("")}</ul>`); list = null; } };
+  while (i < lines.length) {
+    const line = lines[i], trimmed = line.trim();
+    if (/^```/.test(trimmed)) {
+      flushPara(); flushList();
+      const code = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i].trim())) code.push(lines[i++]);
+      i++;
+      const html = esc(code.join("\n")).replace(/^(#{1,6} .*)$/gm, '<span class="kw">$1</span>');
+      out.push(`<pre><code>${html}</code></pre>`);
+      continue;
+    }
+    const m = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?$/);
+    if (m) { flushPara(); flushList(); media.push({ alt: m[1], src: m[2], attrs: parseAttrs(m[3]) }); i++; continue; }
+    if (/^[-*] /.test(trimmed)) { flushPara(); (list ||= []).push(trimmed.slice(2)); words += trimmed.split(/\s+/).length; i++; continue; }
+    if (!trimmed) { flushPara(); flushList(); i++; continue; }
+    flushList(); para.push(trimmed); i++;
+  }
+  flushPara(); flushList();
+  return { html: out.join(""), media, words };
+}
+function parseDeck(src) {
+  const lines = src.replace(/\r/g, "").split("\n");
+  let i = 0; const meta = {};
+  while (i < lines.length && !lines[i].trim()) i++;
+  if (lines[i]?.trim() === "---") {
+    i++;
+    while (i < lines.length && lines[i].trim() !== "---") { const m = lines[i].match(/^([\w-]+):\s*(.*)$/); if (m) meta[m[1]] = m[2].trim(); i++; }
+    i++;
+  }
+  const nodes = []; let cur = null, body = [], fence = false;
+  const flush = () => { if (cur) cur.src = body.join("\n"); body = []; };
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^```/.test(line.trim())) fence = !fence;
+    const h = !fence && line.match(/^(#{1,6})\s+(.+?)\s*(?:\{([^}]*)\})?\s*$/);
+    if (h) {
+      flush();
+      const a = parseAttrs(h[3]);
+      cur = { level: h[1].length, title: h[2], id: a.id || slug(h[2]), classes: a.classes, kv: a.kv, children: [], parent: null };
+      cur.detour = cur.classes.includes("detour");
+      nodes.push(cur);
+    } else body.push(line);
+  }
+  flush();
+  const root = nodes[0], stack = [root];
+  for (const n of nodes.slice(1)) {
+    while (stack.length > 1 && stack[stack.length - 1].level >= n.level) stack.pop();
+    n.parent = stack[stack.length - 1]; n.parent.children.push(n); stack.push(n);
+  }
+  for (const n of nodes) Object.assign(n, renderBody(n.src || ""));
+  return { meta, root, nodes };
+}
+
+// ---------------------------------------------------------------- layout
+// The trunk runs east. Each trunk station sends its branch up or down the
+// slope, alternating; deeper detail turns east again, smaller each level.
+// Placement is greedy: slide each subtree along its trail until it touches nothing.
+const BASE_W = 1600, BASE_H = 1000, BRANCH_ANGLE = 58 * Math.PI / 180;
+const LEVEL_SCALE = { 1: 1, 2: 1, 3: 0.62, 4: 0.42, 5: 0.3, 6: 0.22 };
+function overlaps(a, b, g) { return a.x < b.x + b.w + g && a.x + a.w + g > b.x && a.y < b.y + b.h + g && a.y + a.h + g > b.y; }
+function sepDelta(a, b, u, g) {
+  let best = Infinity;
+  if (u.x > 1e-6) best = Math.min(best, (b.x + b.w + g - a.x) / u.x);
+  if (u.x < -1e-6) best = Math.min(best, (b.x - g - (a.x + a.w)) / u.x);
+  if (u.y > 1e-6) best = Math.min(best, (b.y + b.h + g - a.y) / u.y);
+  if (u.y < -1e-6) best = Math.min(best, (b.y - g - (a.y + a.h)) / u.y);
+  return best;
+}
+function layoutDeck(deck) {
+  const { root, nodes } = deck;
+  for (const n of nodes) { n.s = LEVEL_SCALE[n.level] ?? 0.2; n.ww = BASE_W * n.s; n.wh = BASE_H * n.s; }
+  let side = 1;
+  function shape(n, seqAngle) {
+    const rects = [{ x: -n.ww / 2, y: -n.wh / 2, w: n.ww, h: n.wh }];
+    n.seq = [...n.children.filter(c => !c.detour), ...n.children.filter(c => c.detour)];
+    if (!n.seq.length) return rects;
+    let angle;
+    if (n.level === 1) angle = 0;
+    else if (Math.abs(seqAngle) < 1e-6) {
+      if (n.level === 2) { side = -side; n.side = side; } else n.side = n.parent.side ?? side;
+      angle = n.side * BRANCH_ANGLE;
+    } else angle = 0;
+    n.side ??= n.parent?.side ?? 1;
+    n.childAngle = angle;
+    const u = { x: Math.cos(angle), y: Math.sin(angle) }, perp = { x: -u.y, y: u.x };
+    const g = 0.3 * n.seq[0].ww;
+    let t = 0;
+    n.seq.forEach((c, k) => {
+      const cr = shape(c, angle);
+      const off = n.level === 1 ? 0.3 * BASE_H * Math.sin(k * 1.9 + 0.7) : 0.1 * c.wh * (k % 2 ? 1 : -1);
+      for (let iter = 0; iter < 400; iter++) {
+        const px = u.x * t + perp.x * off, py = u.y * t + perp.y * off;
+        let delta = 0;
+        for (const r of cr) {
+          const a = { x: r.x + px, y: r.y + py, w: r.w, h: r.h };
+          for (const b of rects) if (overlaps(a, b, g)) delta = Math.max(delta, sepDelta(a, b, u, g));
+        }
+        if (delta <= 0) break;
+        t += delta + 1;
+      }
+      c.lx = u.x * t + perp.x * off; c.ly = u.y * t + perp.y * off;
+      for (const r of cr) rects.push({ x: r.x + c.lx, y: r.y + c.ly, w: r.w, h: r.h });
+    });
+    return rects;
+  }
+  shape(root, 0);
+  (function place(n, x, y) { n.x = x; n.y = y; for (const c of n.children) place(c, x + c.lx, y + c.ly); })(root, 0, 0);
+
+  // Trails: each sequence is a chain from its parent through its children.
+  const edges = [];
+  for (const n of nodes) {
+    if (!n.seq?.length) continue;
+    const u = { x: Math.cos(n.childAngle), y: Math.sin(n.childAngle) };
+    let prev = n;
+    for (const c of n.seq) {
+      const a = { x: prev.x, y: prev.y }, b = { x: c.x, y: c.y };
+      const d = Math.hypot(b.x - a.x, b.y - a.y) / 3;
+      const p1 = { x: a.x + u.x * d, y: a.y + u.y * d }, p2 = { x: b.x - u.x * d, y: b.y - u.y * d };
+      const pts = []; let len = 0;
+      for (let i = 0; i <= 48; i++) {
+        const t = i / 48, mt = 1 - t;
+        const x = mt * mt * mt * a.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * b.x;
+        const y = mt * mt * mt * a.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * b.y;
+        if (pts.length) len += Math.hypot(x - pts[pts.length - 1].x, y - pts[pts.length - 1].y);
+        pts.push({ x, y, l: len });
+      }
+      const e = { id: c.id, from: prev, to: c, pts, len, trunk: n.level === 1, detour: c.detour };
+      c.edge = e; c.trailParent = prev; edges.push(e);
+      prev = c;
+    }
+  }
+  deck.edges = edges;
+  for (const n of [...nodes].reverse()) {
+    let b = { x0: n.x - n.ww / 2, y0: n.y - n.wh / 2, x1: n.x + n.ww / 2, y1: n.y + n.wh / 2 };
+    for (const c of n.children) b = { x0: Math.min(b.x0, c.bbox.x0), y0: Math.min(b.y0, c.bbox.y0), x1: Math.max(b.x1, c.bbox.x1), y1: Math.max(b.y1, c.bbox.y1) };
+    n.bbox = b;
+  }
+  deck.bbox = root.bbox;
+}
+
+// ---------------------------------------------------------------- terrain
+// Contours from value noise, flattened into plateaus under each station,
+// so the land is shaped around the talk.
+function buildTerrain(deck, seed) {
+  const b = deck.bbox, mx = (b.x1 - b.x0) * 0.5, my = (b.y1 - b.y0) * 0.7;
+  const x0 = b.x0 - mx, y0 = b.y0 - my, x1 = b.x1 + mx, y1 = b.y1 + my;
+  const cell = Math.max(40, (x1 - x0) / 520);
+  const nx = Math.ceil((x1 - x0) / cell) + 1, ny = Math.ceil((y1 - y0) / cell) + 1;
+  const noise = valueNoise(seed), f = 1 / 2900;
+  const LEVELS = 18, PLATEAU = 0.08 + 9.5 * (0.84 / LEVELS);
+  const stations = deck.nodes.map(n => ({ x: n.x, y: n.y, r2: Math.pow(n.ww * 0.62, 2) }));
+  const v = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const x = x0 + i * cell, y = y0 + j * cell;
+    let h = 0, amp = 0.55, fr = f;
+    for (let o = 0; o < 3; o++) { h += amp * noise(x * fr + 31.7 * o, y * fr - 17.3 * o); amp *= 0.45; fr *= 2.03; }
+    let wsum = 0, flat = 0;
+    for (const s of stations) { const d2 = (x - s.x) ** 2 + (y - s.y) ** 2; const w = Math.exp(-d2 / (2 * s.r2)); wsum += w; flat += w * PLATEAU; }
+    if (wsum > 0) h = lerp(h, flat / wsum, clamp(wsum) * 0.85);
+    v[j * nx + i] = h;
+  }
+  const minor = new Path2D(), major = new Path2D();
+  const SEGS = { 1: [[3, 2]], 2: [[2, 1]], 3: [[3, 1]], 4: [[0, 1]], 5: [[0, 3], [2, 1]], 6: [[0, 2]], 7: [[0, 3]], 8: [[0, 3]], 9: [[0, 2]], 10: [[0, 1], [3, 2]], 11: [[0, 1]], 12: [[3, 1]], 13: [[2, 1]], 14: [[3, 2]] };
+  for (let li = 1; li < LEVELS; li++) {
+    const L = 0.08 + li * (0.84 / LEVELS), path = li % 4 === 0 ? major : minor;
+    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const a = v[j * nx + i], bb = v[j * nx + i + 1], c = v[(j + 1) * nx + i + 1], d = v[(j + 1) * nx + i];
+      const code = (a > L ? 8 : 0) | (bb > L ? 4 : 0) | (c > L ? 2 : 0) | (d > L ? 1 : 0);
+      const segs = SEGS[code]; if (!segs) continue;
+      const x = x0 + i * cell, y = y0 + j * cell;
+      const pt = e => e === 0 ? [x + cell * (L - a) / (bb - a), y] : e === 1 ? [x + cell, y + cell * (L - bb) / (c - bb)]
+        : e === 2 ? [x + cell * (L - d) / (c - d), y + cell] : [x, y + cell * (L - a) / (d - a)];
+      for (const [e0, e1] of segs) { const p = pt(e0), q = pt(e1); path.moveTo(p[0], p[1]); path.lineTo(q[0], q[1]); }
+    }
+  }
+  return { minor, major };
+}
+
+// ---------------------------------------------------------------- camera flights
+// van Wijk & Nuij (2003): the optimal path between two views rises and falls
+// like a flight, so the camera passes over whatever the two ends share.
+function zoomPath(a, b, rho) {
+  const rho2 = rho * rho, rho4 = rho2 * rho2;
+  const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+  if (d2 < 1e-6) {
+    const S = Math.log(b.w / a.w) / rho;
+    return { S: Math.abs(S), f: t => ({ x: a.x + t * dx, y: a.y + t * dy, w: a.w * Math.exp(rho * t * S) }) };
+  }
+  const d1 = Math.sqrt(d2);
+  const b0 = (b.w * b.w - a.w * a.w + rho4 * d2) / (2 * a.w * rho2 * d1);
+  const b1 = (b.w * b.w - a.w * a.w - rho4 * d2) / (2 * b.w * rho2 * d1);
+  const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0), r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
+  const S = (r1 - r0) / rho, c0 = Math.cosh(r0);
+  return {
+    S,
+    f: t => {
+      const s = t * S, u = a.w / (rho2 * d1) * (c0 * Math.tanh(rho * s + r0) - Math.sinh(r0));
+      return { x: a.x + u * dx, y: a.y + u * dy, w: a.w * c0 / Math.cosh(rho * s + r0) };
+    },
+  };
+}
+
+// ---------------------------------------------------------------- app
+const params = new URLSearchParams(location.search);
+const CAPTURE = params.has("capture");
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const deck = parseDeck(document.getElementById("deck").textContent);
+layoutDeck(deck);
+const terrain = buildTerrain(deck, hash(deck.meta.title || "pathway"));
+const { root, nodes, edges } = deck;
+const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+const stage = document.getElementById("stage"), canvas = document.getElementById("ground"), ctx = canvas.getContext("2d");
+const worldEl = document.getElementById("world"), labelsEl = document.getElementById("labels");
+const crumbsEl = document.getElementById("crumbs"), statusEl = document.getElementById("status"), sheetEl = document.getElementById("sheet");
+const mini = document.getElementById("minimap"), mctx = mini.getContext("2d");
+const docEl = document.documentElement;
+if (CAPTURE) docEl.classList.add("capture");
+if (params.get("skin")) docEl.dataset.skin = params.get("skin");
+else if (deck.meta.skin && deck.meta.skin !== "sectional") docEl.dataset.skin = deck.meta.skin;
+let motionProfile = params.get("motion") || "cinematic";
+
+// Route: the map, then reading order with a pull-back after each branch, then the map again, lit.
+function compileRoute(start) {
+  const stops = [];
+  (function walk(n, includeDetours) {
+    for (const c of n.seq) {
+      if (c.detour && !includeDetours) continue;
+      stops.push({ kind: "node", node: c });
+      if (c.seq.some(k => includeDetours || !k.detour)) { walk(c, includeDetours); stops.push({ kind: "overview", node: c }); }
+    }
+  })(start, start !== root);
+  const out = [];
+  for (const s of stops) { if (s.kind === "overview" && out.at(-1)?.kind === "overview") out.pop(); out.push(s); }
+  return out;
+}
+const route = [{ kind: "map" }, { kind: "node", node: root }, ...compileRoute(root), { kind: "map", final: true }];
+route.forEach((s, i) => { if (s.kind === "node" && s.node.stop == null) s.node.stop = i + 1; });
+
+// Cards and labels
+for (const n of nodes) {
+  const card = document.createElement("article");
+  const wide = n.media.some(m => m.attrs.classes.includes("wide"));
+  card.className = ["card", n === root && "root", n.detour && "detour", n.media.length && "has-media", wide && "wide-media"].filter(Boolean).join(" ");
+  const parentTitle = n.parent ? (n.parent === root ? "" : n.parent.title) : "";
+  const eyebrow = n === root ? "" : `<header class="eyebrow">${n.detour ? '<span class="tag">Detour</span>' : `<span class="num">Stop ${pad2(n.stop)}</span>`}${parentTitle ? `<span>${esc(parentTitle)}</span>` : ""}</header>`;
+  const fig = n.media.map(m => {
+    const isVideo = /\.(mp4|webm|mov)$/i.test(m.src);
+    if (isVideo) {
+      const base = m.src.replace(/\.(mp4|webm|mov)$/i, "");
+      return `<figure><video muted playsinline ${m.attrs.kv.loop ? "loop" : ""} preload="none" data-base="${esc(base)}"></video>${m.alt ? `<figcaption>${esc(m.alt)}</figcaption>` : ""}</figure>`;
+    }
+    return `<figure><img src="${esc(m.src)}" alt="${esc(m.alt)}" decoding="async"></figure>`;
+  }).join("");
+  card.innerHTML = `<div class="inner">${eyebrow}${n === root ? `<h1>${esc(n.title)}</h1>` : `<h2>${esc(n.title)}</h2>`}<div class="md">${n.html}</div>${fig}</div>`;
+  worldEl.appendChild(card);
+  n.card = card;
+  n.video = card.querySelector("video");
+  const label = document.createElement("div");
+  label.className = "label" + (n.detour ? " detour" : "");
+  label.textContent = n.title;
+  label.dataset.id = n.id;
+  labelsEl.appendChild(label);
+  n.label = label;
+}
+function loadVideo(n) {
+  const v = n.video;
+  if (!v || v.dataset.loaded) return;
+  v.dataset.loaded = "1";
+  v.innerHTML = `<source src="${v.dataset.base}.webm" type="video/webm"><source src="${v.dataset.base}.mp4" type="video/mp4">`;
+  v.load();
+}
+
+// ---------------------------------------------------------------- viewport, framing
+let vw = 1, vh = 1, dpr = 1, cw = 1280, ch = 720, narrow = false, sheetH = 0, frame = { x: 0, y: 0, w: 1, h: 1 };
+function measure() {
+  vw = stage.clientWidth; vh = stage.clientHeight; dpr = Math.min(window.devicePixelRatio || 1, 2);
+  narrow = vw < 720 || vw / vh < 0.9;
+  docEl.classList.toggle("narrow", narrow);
+  if (narrow) {
+    sheetH = Math.round(vh * 0.46);
+    frame = { x: 0, y: 56, w: vw, h: Math.max(120, vh - sheetH - 56 - 64) };
+    cw = 1280; ch = 800;
+  } else {
+    sheetH = 0;
+    frame = { x: 0, y: 58, w: vw, h: vh - 58 - 70 };
+    cw = Math.floor(Math.min(vw * 0.6, frame.h * 0.8 * 1.6)); ch = Math.round(cw / 1.6);
+  }
+  docEl.style.setProperty("--sheet-h", sheetH + "px");
+  worldEl.style.setProperty("--cw", cw + "px"); worldEl.style.setProperty("--ch", ch + "px");
+  canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
+  mini.width = Math.round(184 * dpr); mini.height = Math.round(104 * dpr);
+}
+function camFor(cx, cy, k) {
+  const fx = frame.x + frame.w / 2, fy = frame.y + frame.h / 2;
+  return { x: cx - (fx - vw / 2) / k, y: cy - (fy - vh / 2) / k, w: vw / k };
+}
+function fitNode(n) {
+  const k = narrow ? Math.min(frame.w * 0.94 / n.ww, frame.h * 0.94 / n.wh) : cw / n.ww;
+  return camFor(n.x, n.y, k);
+}
+function fitBox(b, pad = 1.12) {
+  const w = (b.x1 - b.x0) * pad, h = (b.y1 - b.y0) * pad;
+  return camFor((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, Math.min(frame.w / w, frame.h / h));
+}
+function camForStop(s) { return s.kind === "map" ? fitBox(deck.bbox, 1.06) : s.kind === "overview" ? fitBox(s.node.bbox, 1.14) : fitNode(s.node); }
+const stopNode = s => (s.kind === "map" ? null : s.node);
+
+// ---------------------------------------------------------------- tokens
+let T = {};
+function readTokens() {
+  const cs = getComputedStyle(docEl), g = k => cs.getPropertyValue(k).trim();
+  T = {
+    ground: g("--ground"), contour: g("--contour"), contourMajor: g("--contour-major"), trail: g("--trail"), route: g("--route"),
+    ink: g("--ink"), ink2: g("--ink-2"), card: g("--card"), terrain: g("--terrain") || "contours",
+    speed: parseFloat(g("--flight-speed")) || 1, max: parseFloat(g("--flight-max")) || 2.6, rho: parseFloat(g("--flight-rho")) || Math.SQRT2,
+  };
+}
+
+// ---------------------------------------------------------------- timeline
+// All motion is a pure function of time. Live mode appends segments as you
+// navigate; tour and capture modes precompute them. Rendering only ever asks
+// "where is everything at time t?", which is what makes video export possible.
+class Timeline {
+  constructor(cam) { this.segs = [{ t0: -1e9, dur: 0, from: cam, to: cam, kind: "cut", target: { kind: "map" }, edges: [], total: 0 }]; }
+  last() { return this.segs[this.segs.length - 1]; }
+  segAt(t) { for (let i = this.segs.length - 1; i >= 0; i--) if (this.segs[i].t0 <= t) return [this.segs[i], i]; return [this.segs[0], 0]; }
+  camAt(t) {
+    const [s] = this.segAt(t);
+    const p = s.dur > 0 ? clamp((t - s.t0) / s.dur) : 1;
+    if (s.kind === "fly") return { ...s.path.f(s.ease(p)), fade: 1 };
+    if (s.kind === "fade") return { ...(p < 0.5 ? s.from : s.to), fade: Math.abs(1 - 2 * p) };
+    return { ...s.to, fade: 1 };
+  }
+  litAt(t) {
+    const lit = new Map(), visited = new Set();
+    for (let i = 0; i < this.segs.length; i++) {
+      const s = this.segs[i];
+      if (s.t0 > t) break;
+      const end = Math.min(t, this.segs[i + 1]?.t0 ?? Infinity);
+      const p = s.dur > 0 ? clamp((end - s.t0) / s.dur) : 1;
+      if (p >= 1 && s.target.node && s.kind !== "manual") visited.add(s.target.node);
+      if (!s.total) continue;
+      let litLen = (s.ease ? s.ease(p) : p) * s.total, acc = 0;
+      for (const e of s.edges) {
+        const f = clamp((litLen - acc) / e.len); acc += e.len;
+        const prev = lit.get(e.id);
+        if (!prev || f > prev.f) lit.set(e.id, { f, rev: e.rev });
+      }
+    }
+    return { lit, visited };
+  }
+  end() { const s = this.last(); return s.t0 + s.dur; }
+}
+function trailPath(a, b) {
+  if (!a || !b || a === b) return [];
+  const chain = n => { const c = []; while (n) { c.push(n); n = n.trailParent; } return c; };
+  const ca = chain(a), cb = chain(b), setB = new Set(cb);
+  const lca = ca.find(n => setB.has(n));
+  const up = [], down = [];
+  for (const n of ca) { if (n === lca) break; up.push({ id: n.id, len: n.edge.len, rev: true }); }
+  for (const n of cb) { if (n === lca) break; down.unshift({ id: n.id, len: n.edge.len, rev: false }); }
+  return [...up, ...down];
+}
+function makeSeg(tl, t0, toCam, target, opts = {}) {
+  const from = tl.camAt(t0);
+  delete from.fade;
+  const fromNode = tl.segAt(t0)[0].target.node || null;
+  const toNode = target.node || null;
+  const { lit } = tl.litAt(t0);
+  const edgesNew = (fromNode && toNode ? trailPath(fromNode, toNode) : []).filter(e => (lit.get(e.id)?.f ?? 0) < 1);
+  const total = edgesNew.reduce((a, e) => a + e.len, 0);
+  const profile = opts.profile || (reducedMotion ? "reduced" : motionProfile);
+  if (profile === "reduced") return { t0, dur: 0.45, from, to: toCam, kind: "fade", target, edges: edgesNew, total, ease: t => t };
+  const rho = profile === "remote" ? 1.05 : T.rho;
+  const path = zoomPath(from, toCam, rho);
+  let dur = profile === "remote" ? clamp(path.S * 0.24, 0.28, 0.7) : clamp(path.S * 0.62, 0.75, T.max) / T.speed;
+  if (path.S < 1e-4) dur = 0.01;
+  return { t0, dur, from, to: toCam, path, kind: "fly", target, edges: edgesNew, total, ease: profile === "remote" ? easeInOutQuad : smootherstep };
+}
+
+// Live navigation state
+const now = () => performance.now() / 1000;
+let live = new Timeline(camForStop(route[0]));
+live.segs[0].target = route[0];
+let ri = 0, offRoute = false, excursion = null, mode = "live", tour = null;
+let dirty = true, lastInteraction = 0, introHint = true;
+
+function flyTo(cam, target) {
+  const t = now();
+  live.segs.push(makeSeg(live, t, cam, target));
+  dirty = true; updateHud();
+}
+function goStop(i) {
+  ri = clamp(i, 0, route.length - 1); offRoute = false; excursion = null;
+  flyTo(camForStop(route[ri]), route[ri]);
+}
+function currentTarget() { return excursion ? excursion.stops[excursion.i] : offRoute ? live.last().target : route[ri]; }
+function currentNode() { const t = currentTarget(); return t.node || root; }
+function availableDetours(n) {
+  if (!n) return [];
+  const pool = [...n.children.filter(c => c.detour), ...(n.parent ? n.parent.children.filter(c => c.detour && c !== n) : [])];
+  return [...new Set(pool)];
+}
+function startExcursion(d) {
+  const stops = [{ kind: "node", node: d }, ...compileRoute(d)];
+  excursion = { stops, i: 0, detour: d };
+  offRoute = true;
+  flyTo(camForStop(stops[0]), stops[0]);
+}
+function next() {
+  if (mode !== "live") return;
+  introHint = false;
+  if (excursion) {
+    if (excursion.i + 1 < excursion.stops.length) { excursion.i++; flyTo(camForStop(excursion.stops[excursion.i]), excursion.stops[excursion.i]); return; }
+    excursion = null; goStop(ri + 1); return;
+  }
+  goStop(ri + 1);
+}
+function prev() {
+  if (mode !== "live") return;
+  introHint = false;
+  if (excursion || offRoute) { goStop(ri); return; }
+  goStop(ri - 1);
+}
+function dive() {
+  if (mode !== "live") return;
+  const n = currentNode();
+  const ds = availableDetours(n);
+  if (ds.length) { startExcursion(ds[0]); return; }
+  const first = n.seq?.[0];
+  if (first) { const j = route.findIndex(s => s.kind === "node" && s.node === first); if (j >= 0) goStop(j); }
+}
+function surface() {
+  if (mode !== "live") return;
+  if (excursion) { excursion = null; goStop(ri); return; }
+  const n = currentNode();
+  const t = currentTarget();
+  offRoute = true;
+  if (t.kind === "node" && n.seq?.length) flyTo(camForStop({ kind: "overview", node: n }), { kind: "overview", node: n });
+  else if (n.parent && n.parent !== root) flyTo(camForStop({ kind: "overview", node: n.parent }), { kind: "overview", node: n.parent });
+  else flyTo(camForStop({ kind: "map" }), { kind: "map" });
+}
+function showMap() { if (mode !== "live") return; excursion = null; offRoute = ri !== 0 && !route[ri].final; flyTo(camForStop({ kind: "map" }), { kind: "map" }); }
+function visitNode(n) {
+  if (mode !== "live") return;
+  excursion = null; offRoute = true; introHint = false;
+  flyTo(fitNode(n), { kind: "node", node: n });
+}
+function manualCam(cam) {
+  if (mode !== "live") return;
+  const t = now(), last = live.last();
+  offRoute = true; excursion = null; introHint = false;
+  if (last.kind === "manual") { last.t0 = t; last.to = cam; last.from = cam; }
+  else live.segs.push({ t0: t, dur: 0, from: cam, to: cam, kind: "manual", target: { ...last.target, node: last.target.node }, edges: [], total: 0 });
+  dirty = true; updateHud();
+}
+
+// ---------------------------------------------------------------- tour (precomputed timeline)
+function holdFor(s) {
+  if (s.kind === "map") return s.final ? 4.2 : 2.6;
+  if (s.kind === "overview") return 1.9;
+  if (s.node === root) return 3.2;
+  return clamp(1.7 + s.node.words * 0.075, 2.4, 4.6) + (s.node.video ? 2 : 0);
+}
+function buildTour(profile) {
+  const tl = new Timeline(camForStop(route[0]));
+  tl.segs[0].target = route[0];
+  let t = holdFor(route[0]);
+  tl.arrivals = [{ t: 0, stop: route[0] }];
+  for (let i = 1; i < route.length; i++) {
+    const seg = makeSeg(tl, t, camForStop(route[i]), route[i], { profile });
+    tl.segs.push(seg);
+    tl.arrivals.push({ t: t + seg.dur, stop: route[i] });
+    t += seg.dur + holdFor(route[i]);
+  }
+  tl.duration = t;
+  return tl;
+}
+function enterTour() {
+  tour = { tl: buildTour(), playing: true, t: 0, origin: now() };
+  mode = "tour"; docEl.classList.add("touring");
+  document.querySelector("#btn-tour span:last-child").textContent = "Exit tour";
+  dirty = true;
+}
+function exitTour() {
+  const cam = tour.tl.camAt(tour.t); delete cam.fade;
+  mode = "live"; tour = null; docEl.classList.remove("touring");
+  document.querySelector("#btn-tour span:last-child").textContent = "Play tour";
+  live.segs.push({ t0: now(), dur: 0, from: cam, to: cam, kind: "cut", target: { kind: "map" }, edges: [], total: 0 });
+  goStop(ri);
+}
+function tourTime() { if (!tour) return 0; if (tour.playing) tour.t = Math.min(tour.tl.duration, now() - tour.origin); return tour.t; }
+
+// ---------------------------------------------------------------- render
+const smallTarget = { kind: "map" };
+function render(tl, t) {
+  const cam = tl.camAt(t), k = vw / cam.w;
+  const { lit, visited } = tl.litAt(t);
+  const [seg] = tl.segAt(t);
+  const settled = t >= seg.t0 + seg.dur;
+  const toScreen = (x, y) => [(x - cam.x) * k + vw / 2, (y - cam.y) * k + vh / 2];
+  const remote = motionProfile === "remote";
+  docEl.classList.toggle("remote", remote);
+
+  // ground
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = T.ground; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (vw / 2 - cam.x * k), dpr * (vh / 2 - cam.y * k));
+  const mapW = (deck.bbox.x1 - deck.bbox.x0) * 1.06;
+  if (!remote && T.terrain === "contours") {
+    ctx.lineWidth = 1 / k;
+    ctx.strokeStyle = T.contour; ctx.globalAlpha = 0.16 + 0.6 * smoothstep(mapW * 0.6, mapW * 0.12, cam.w);
+    ctx.stroke(terrain.minor);
+    ctx.strokeStyle = T.contourMajor; ctx.lineWidth = 1.5 / k; ctx.globalAlpha = 0.55 + 0.3 * smoothstep(mapW * 0.6, mapW * 0.12, cam.w);
+    ctx.stroke(terrain.major);
+    ctx.globalAlpha = 1;
+  } else if (!remote && T.terrain === "dots") {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const base = Math.pow(2, Math.floor(Math.log2(cam.w / 24)));
+    for (const [sp, alpha] of [[base, 1 - (Math.log2(cam.w / 24) % 1)], [base * 2, 1]]) {
+      ctx.fillStyle = T.contourMajor; ctx.globalAlpha = 0.75 * alpha;
+      const x0 = Math.floor((cam.x - cam.w / 2) / sp) * sp, y0 = Math.floor((cam.y - (vh / k) / 2) / sp) * sp;
+      for (let x = x0; x < cam.x + cam.w / 2 + sp; x += sp) for (let y = y0; y < cam.y + vh / k / 2 + sp; y += sp) {
+        const [sx, sy] = toScreen(x, y); ctx.fillRect(sx - 1, sy - 1, 2, 2);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (vw / 2 - cam.x * k), dpr * (vh / 2 - cam.y * k));
+  }
+  // trails: dashed where unwalked, the route color where walked
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const e of edges) {
+    ctx.beginPath(); ctx.moveTo(e.pts[0].x, e.pts[0].y);
+    for (const p of e.pts) ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = T.trail; ctx.lineWidth = (e.trunk ? 1.8 : 1.4) / k;
+    ctx.setLineDash(e.detour ? [2 / k, 7 / k] : [7 / k, 6 / k]);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for (const e of edges) {
+    const L = lit.get(e.id); if (!L || L.f <= 0) continue;
+    const want = L.f * e.len;
+    ctx.beginPath();
+    if (!L.rev) {
+      ctx.moveTo(e.pts[0].x, e.pts[0].y);
+      for (let i = 1; i < e.pts.length; i++) {
+        const p = e.pts[i], q = e.pts[i - 1];
+        if (p.l <= want) ctx.lineTo(p.x, p.y); else { const r = (want - q.l) / (p.l - q.l); ctx.lineTo(lerp(q.x, p.x, r), lerp(q.y, p.y, r)); break; }
+      }
+    } else {
+      const startL = e.len - want, last = e.pts[e.pts.length - 1];
+      ctx.moveTo(last.x, last.y);
+      for (let i = e.pts.length - 2; i >= 0; i--) {
+        const p = e.pts[i], q = e.pts[i + 1];
+        if (p.l >= startL) ctx.lineTo(p.x, p.y); else { const r = (q.l - startL) / (q.l - p.l); ctx.lineTo(lerp(q.x, p.x, r), lerp(q.y, p.y, r)); break; }
+      }
+    }
+    ctx.strokeStyle = T.route; ctx.lineWidth = (e.trunk ? 3.4 : 2.6) / k; ctx.stroke();
+  }
+  // stations too small to show a card become dots
+  for (const n of nodes) {
+    const sw = n.ww * k; if (sw > 30) continue;
+    ctx.beginPath(); ctx.arc(n.x, n.y, (n.level <= 2 ? 4 : 3) / k, 0, Math.PI * 2);
+    ctx.fillStyle = visited.has(n) ? T.route : T.trail; ctx.fill();
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // cards and labels
+  const focusNode = seg.target.kind === "node" ? seg.target.node : null;
+  for (const n of nodes) {
+    const [sx, sy] = toScreen(n.x, n.y), sw = n.ww * k, sh = n.wh * k;
+    const onScreen = sx + sw / 2 > -40 && sx - sw / 2 < vw + 40 && sy + sh / 2 > -40 && sy - sh / 2 < vh + 40;
+    const op = smoothstep(8, 30, sw) * cam.fade;
+    if (!onScreen || op <= 0.01) { if (n.cardVis !== false) { n.card.style.visibility = "hidden"; n.cardVis = false; } }
+    else {
+      if (n.cardVis !== true) { n.card.style.visibility = "visible"; n.cardVis = true; }
+      const sc = sw / cw;
+      n.card.style.transform = `translate(${(sx - sw / 2).toFixed(2)}px, ${(sy - sh / 2).toFixed(2)}px) scale(${sc.toFixed(5)})`;
+      n.card.style.opacity = op.toFixed(3);
+    }
+    const th = n.level <= 2 ? [40, 70] : n.level === 3 ? [92, 132] : [118, 165];
+    const big = Math.min(cw, vw);
+    const la = smoothstep(th[0], th[1], sw) * (1 - smoothstep(big * 0.28, big * 0.46, sw)) * cam.fade;
+    if (!onScreen || la <= 0.02 || n === root) { if (n.lblVis !== false) { n.label.style.visibility = "hidden"; n.lblVis = false; } }
+    else {
+      if (n.lblVis !== true) { n.label.style.visibility = "visible"; n.lblVis = true; }
+      n.label.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + sh / 2 + 6).toFixed(1)}px) translateX(-50%)`;
+      n.label.style.opacity = la.toFixed(3);
+    }
+    if (n.video && (sw > 140 || n === focusNode)) loadVideo(n);
+    if (n.video && !CAPTURE) {
+      const play = n === focusNode && settled && mode !== "capture" && (mode === "live" || tour?.playing);
+      if (play && n.video.paused) n.video.play().catch(() => {});
+      if (!play && !n.video.paused) n.video.pause();
+    }
+  }
+  drawMinimap(cam, lit);
+  return { cam, seg, settled, focusNode };
+}
+
+let miniXf = null;
+function drawMinimap(cam, lit) {
+  if (narrow) return;
+  const W = 184, H = 104, b = deck.bbox, padm = 10;
+  const s = Math.min((W - 2 * padm) / (b.x1 - b.x0), (H - 2 * padm) / (b.y1 - b.y0));
+  const ox = padm + ((W - 2 * padm) - (b.x1 - b.x0) * s) / 2 - b.x0 * s, oy = padm + ((H - 2 * padm) - (b.y1 - b.y0) * s) / 2 - b.y0 * s;
+  miniXf = { s, ox, oy };
+  mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  mctx.clearRect(0, 0, W, H);
+  mctx.lineCap = "round";
+  for (const e of edges) {
+    const L = lit.get(e.id);
+    mctx.beginPath();
+    e.pts.forEach((p, i) => (i ? mctx.lineTo(p.x * s + ox, p.y * s + oy) : mctx.moveTo(p.x * s + ox, p.y * s + oy)));
+    mctx.strokeStyle = L && L.f >= 0.999 ? T.route : T.trail;
+    mctx.lineWidth = L && L.f >= 0.999 ? 2 : 1;
+    mctx.globalAlpha = L && L.f >= 0.999 ? 1 : 0.7;
+    mctx.stroke();
+  }
+  mctx.globalAlpha = 1;
+  for (const n of nodes) { mctx.fillStyle = T.ink2; mctx.fillRect(n.x * s + ox - 1.5, n.y * s + oy - 1.5, 3, 3); }
+  const hw = cam.w / 2, hh = (cam.w * vh / vw) / 2;
+  mctx.strokeStyle = T.ink; mctx.lineWidth = 1.2;
+  mctx.strokeRect((cam.x - hw) * s + ox, (cam.y - hh) * s + oy, 2 * hw * s, 2 * hh * s);
+}
+
+// ---------------------------------------------------------------- HUD
+function crumbsFor(n) {
+  const path = []; let c = n;
+  while (c) { path.unshift(c); c = c.parent; }
+  return path.map((p, i) => (i === path.length - 1 ? `<b>${esc(p.title)}</b>` : esc(p.title))).join('<span class="sep">/</span>');
+}
+let sheetFor = null;
+function updateHud() {
+  const target = mode === "tour" ? tour.tl.segAt(tour.t)[0].target : currentTarget();
+  const n = target.node || root;
+  crumbsEl.innerHTML = target.kind === "map" ? `<b>${esc(root.title)}</b><span class="sep">/</span>${target.final ? "Everywhere we went" : "The whole map"}` : crumbsFor(n);
+  if (mode === "live") {
+    let line;
+    const total = pad2(route.length);
+    if (excursion) line = `Detour ${excursion.i + 1} of ${excursion.stops.length} <span class="sep">·</span> → returns to stop ${pad2(Math.min(ri + 2, route.length))}`;
+    else if (offRoute) line = `Off route <span class="sep">·</span> → rejoins at stop ${pad2(Math.min(ri + 2, route.length))}`;
+    else line = `<span class="now">Stop ${pad2(ri + 1)}</span> / ${total}${route[ri].kind === "overview" ? " · looking back" : route[ri].kind === "map" ? (route[ri].final ? " · the whole trail" : " · the territory") : ""}`;
+    const ds = excursion ? [] : availableDetours(currentNode());
+    const hint = introHint ? `<div class="hint">Click the map, then press → to travel. Press ? for keys.</div>` : "";
+    statusEl.innerHTML = `<div>${line}</div>${ds.length ? `<div class="detour-hint">↓ Detour: ${esc(ds[0].title)}</div>` : ""}${hint}`;
+  }
+  if (narrow && sheetFor !== target) { sheetFor = target; renderSheet(target); }
+}
+function renderSheet(target) {
+  const n = target.node;
+  if (target.kind === "node") {
+    const c = n.card.querySelector(".inner").cloneNode(true);
+    c.querySelectorAll("video").forEach(v => v.remove());
+    sheetEl.innerHTML = c.innerHTML;
+    if (n.seq.length) sheetEl.insertAdjacentHTML("beforeend", stopsList(n.seq));
+  } else {
+    const list = target.kind === "map" ? root.seq : n.seq;
+    sheetEl.innerHTML = `<header class="eyebrow"><span class="num">${target.kind === "map" ? "The map" : "Branch"}</span></header><h2>${esc(target.kind === "map" ? root.title : n.title)}</h2>${stopsList(list)}`;
+  }
+  sheetEl.scrollTop = 0;
+}
+function stopsList(list) { return `<ul class="stops">${list.map(c => `<li><button type="button" class="${c.detour ? "detour" : ""}" data-id="${c.id}">${esc(c.title)}${c.detour ? " · detour" : ""}</button></li>`).join("")}</ul>`; }
+sheetEl.addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (b) visitNode(byId[b.dataset.id]); });
+
+// ---------------------------------------------------------------- input
+const keyMap = {
+  ArrowRight: next, " ": next, PageDown: next, ArrowLeft: prev, PageUp: prev,
+  ArrowDown: dive, ArrowUp: surface, m: showMap, M: showMap, Escape: () => (mode === "tour" ? exitTour() : showMap()),
+  Home: () => goStop(0), End: () => goStop(route.length - 1),
+  r: toggleMotion, R: toggleMotion, t: toggleSkin, T: toggleSkin, v: toggleTour, V: toggleTour, "?": toggleHelp,
+};
+window.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (mode === "tour" && e.key === " ") { e.preventDefault(); togglePlay(); return; }
+  const f = keyMap[e.key];
+  if (f) { e.preventDefault(); f(); }
+});
+function toggleMotion() {
+  motionProfile = motionProfile === "remote" ? "cinematic" : "remote";
+  document.querySelector("#btn-motion span:last-child").textContent = motionProfile === "remote" ? "Remote" : "Cinematic";
+  dirty = true;
+}
+function toggleSkin() {
+  if (docEl.dataset.skin === "boardroom") delete docEl.dataset.skin; else docEl.dataset.skin = "boardroom";
+  document.querySelector("#btn-skin span:last-child").textContent = docEl.dataset.skin === "boardroom" ? "Boardroom" : "Sectional";
+  readTokens(); dirty = true;
+}
+function toggleTour() { if (mode === "tour") exitTour(); else if (mode === "live") enterTour(); }
+function toggleHelp() { const h = document.getElementById("help"); h.hidden = !h.hidden; }
+function togglePlay() {
+  if (!tour) return;
+  if (tour.playing) { tourTime(); tour.playing = false; }
+  else { if (tour.t >= tour.tl.duration) tour.t = 0; tour.origin = now() - tour.t; tour.playing = true; }
+  dirty = true;
+}
+document.getElementById("btn-next").onclick = () => next();
+document.getElementById("btn-prev").onclick = () => prev();
+document.getElementById("btn-map").onclick = () => showMap();
+document.getElementById("btn-motion").onclick = toggleMotion;
+document.getElementById("btn-skin").onclick = toggleSkin;
+document.getElementById("btn-tour").onclick = toggleTour;
+document.getElementById("btn-help").onclick = toggleHelp;
+document.getElementById("btn-play").onclick = togglePlay;
+const scrub = document.getElementById("scrub-range");
+scrub.addEventListener("input", () => { if (!tour) return; tour.playing = false; tour.t = scrub.value / 1000 * tour.tl.duration; dirty = true; });
+
+const pointers = new Map();
+let drag = null;
+function camNow() { const c = mode === "live" ? live.camAt(now()) : tour.tl.camAt(tourTime()); delete c.fade; return c; }
+stage.addEventListener("pointerdown", e => {
+  if (e.target.closest("#hud button, #hud input, #minimap, #sheet, #help")) return;
+  if (mode !== "live") return;
+  stage.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const cam = camNow();
+  drag = { cam, start: [...pointers.values()].map(p => ({ ...p })), moved: false, target: e.target };
+  stage.focus({ preventScroll: true });
+});
+stage.addEventListener("pointermove", e => {
+  if (!drag || !pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const pts = [...pointers.values()], k0 = vw / drag.cam.w;
+  if (pts.length === 1 && drag.start.length === 1) {
+    const dx = pts[0].x - drag.start[0].x, dy = pts[0].y - drag.start[0].y;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    drag.moved = true; stage.classList.add("dragging");
+    manualCam({ x: drag.cam.x - dx / k0, y: drag.cam.y - dy / k0, w: drag.cam.w });
+  } else if (pts.length === 2) {
+    if (drag.start.length !== 2) { drag = { cam: camNow(), start: pts.map(p => ({ ...p })), moved: true }; return; }
+    const d0 = Math.hypot(drag.start[0].x - drag.start[1].x, drag.start[0].y - drag.start[1].y);
+    const d1 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    const m0 = { x: (drag.start[0].x + drag.start[1].x) / 2, y: (drag.start[0].y + drag.start[1].y) / 2 };
+    const m1 = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+    const w = clampW(drag.cam.w * d0 / Math.max(d1, 1)), k1 = vw / w;
+    const rect = stage.getBoundingClientRect();
+    const wx = drag.cam.x + (m0.x - rect.left - vw / 2) / k0, wy = drag.cam.y + (m0.y - rect.top - vh / 2) / k0;
+    manualCam({ x: wx - (m1.x - rect.left - vw / 2) / k1, y: wy - (m1.y - rect.top - vh / 2) / k1, w });
+  }
+});
+function endPointer(e) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.delete(e.pointerId);
+  if (drag && !drag.moved && pointers.size === 0) {
+    const lbl = drag.target?.closest?.(".label");
+    const hit = lbl ? byId[lbl.dataset.id] : hitTest(e.clientX, e.clientY);
+    if (hit) visitNode(hit);
+  }
+  if (pointers.size === 0) { drag = null; stage.classList.remove("dragging"); }
+}
+stage.addEventListener("pointerup", endPointer);
+stage.addEventListener("pointercancel", endPointer);
+function hitTest(px, py) {
+  const rect = stage.getBoundingClientRect(), cam = camNow(), k = vw / cam.w;
+  const x = cam.x + (px - rect.left - vw / 2) / k, y = cam.y + (py - rect.top - vh / 2) / k;
+  let best = null;
+  for (const n of nodes) if (Math.abs(x - n.x) < n.ww / 2 && Math.abs(y - n.y) < n.wh / 2 && (!best || n.ww < best.ww)) best = n;
+  return best;
+}
+function clampW(w) { const minW = Math.min(...nodes.map(n => n.ww)) * vw / cw * 0.6, maxW = (deck.bbox.x1 - deck.bbox.x0) * 2.2; return clamp(w, minW, maxW); }
+stage.addEventListener("wheel", e => {
+  if (mode !== "live" || e.target.closest("#sheet, #help")) return;
+  e.preventDefault();
+  const cam = camNow(), k0 = vw / cam.w, rect = stage.getBoundingClientRect();
+  const px = e.clientX - rect.left - vw / 2, py = e.clientY - rect.top - vh / 2;
+  const wx = cam.x + px / k0, wy = cam.y + py / k0;
+  const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+  const w = clampW(cam.w * Math.exp(dy * (e.ctrlKey ? 0.01 : 0.0016))), k1 = vw / w;
+  manualCam({ x: wx - px / k1, y: wy - py / k1, w });
+}, { passive: false });
+mini.addEventListener("click", e => {
+  if (!miniXf || mode !== "live") return;
+  const r = mini.getBoundingClientRect(), x = ((e.clientX - r.left) - miniXf.ox) / miniXf.s, y = ((e.clientY - r.top) - miniXf.oy) / miniXf.s;
+  let best = null, bd = Infinity;
+  for (const n of nodes) { const d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = n; } }
+  if (best) visitNode(best);
+});
+
+// ---------------------------------------------------------------- loop
+let lastHudTarget = null;
+function frameLoop() {
+  if (mode === "live") {
+    const t = now();
+    if (dirty || t < live.last().t0 + live.last().dur + 0.05) { render(live, t); dirty = false; }
+  } else if (mode === "tour") {
+    const t = tourTime();
+    if (dirty || tour.playing) {
+      render(tour.tl, t); dirty = false;
+      scrub.value = String(Math.round(t / tour.tl.duration * 1000));
+      document.getElementById("scrub-time").textContent = `${fmtTime(t)} / ${fmtTime(tour.tl.duration)}`;
+      document.getElementById("btn-play").textContent = tour.playing ? "❚❚" : "▶";
+      const tgt = tour.tl.segAt(t)[0].target;
+      if (tgt !== lastHudTarget) { lastHudTarget = tgt; updateHud(); }
+      if (t >= tour.tl.duration && tour.playing) { tour.playing = false; dirty = true; }
+    }
+  }
+  requestAnimationFrame(frameLoop);
+}
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+darkQuery.addEventListener?.("change", () => { readTokens(); dirty = true; });
+new MutationObserver(() => { readTokens(); dirty = true; }).observe(docEl, { attributes: true, attributeFilter: ["data-theme", "data-skin"] });
+window.addEventListener("resize", () => {
+  measure();
+  if (mode === "live") { const tg = currentTarget(); live.segs.push({ t0: now(), dur: 0, from: camForStop(tg), to: camForStop(tg), kind: "cut", target: tg, edges: [], total: 0 }); }
+  else tour.tl = buildTour();
+  sheetFor = null; dirty = true; updateHud();
+});
+
+measure();
+readTokens();
+live = new Timeline(camForStop(route[0]));
+live.segs[0].target = route[0];
+updateHud();
+if (CAPTURE) {
+  // Headless capture: precompute the tour and let the recorder step the clock.
+  mode = "capture";
+  const tl = buildTour(params.get("motion") || "cinematic");
+  nodes.forEach(n => n.video && loadVideo(n));
+  const vids = nodes.filter(n => n.video);
+  const ready = Promise.all([
+    document.fonts.ready,
+    ...[...document.images].map(img => img.decode().catch(() => {})),
+    ...vids.map(n => new Promise(res => { if (n.video.readyState >= 2) res(); else { n.video.addEventListener("loadeddata", res, { once: true }); n.video.addEventListener("error", res, { once: true }); } })),
+  ]);
+  window.pathway = {
+    ready, duration: tl.duration,
+    stops: tl.arrivals.map(a => ({ t: +a.t.toFixed(2), kind: a.stop.kind, id: a.stop.node?.id })),
+    async seek(t) {
+      const { seg, settled, focusNode } = render(tl, t);
+      const tgt = seg.target;
+      if (tgt !== lastHudTarget) { lastHudTarget = tgt; tour = { tl, t }; mode = "tour"; updateHud(); mode = "capture"; }
+      const waits = [];
+      for (const n of vids) {
+        const v = n.video, d = v.duration || 1;
+        const want = n === focusNode && settled ? (t - (seg.t0 + seg.dur)) % d : 0;
+        if (Math.abs(v.currentTime - want) > 0.004) { waits.push(new Promise(r => v.addEventListener("seeked", r, { once: true }))); v.currentTime = want; }
+      }
+      await Promise.all(waits);
+    },
+  };
+} else {
+  requestAnimationFrame(frameLoop);
+  stage.focus({ preventScroll: true });
+}
+})();
+</script>
+</body>
+</html>
