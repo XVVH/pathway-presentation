@@ -43,10 +43,12 @@ Options
   --no-notes          Don't read speaker notes.
   --strict            check: exit 1 on warnings as well as errors.
   --fix               check: apply the fixes marked safe, then check again.
-  --out <path>        build: the folder to write (default: <deck>-build).
+  --out <path>        build: the folder to write (default: <deck>-build, or
+                      <deck>-presenter with --with-notes).
                       render: a folder, or a .png path for one picture.
-  --with-notes        build: include speaker notes for the presenter window.
-                      Anyone with the folder can read them.
+  --with-notes        build: include speaker notes, to present from a machine
+                      without Node. Anyone with the folder can read them, so
+                      never upload it.
   --force             build: build even when the deck has errors.
   --url <address>     build: where the audience copy will live. The closing
                       view shows it as a QR code. Overrides the deck's url.
@@ -152,11 +154,20 @@ async function main(argv: string[]): Promise<number> {
       }
       if (result.check.summary.warnings || result.check.summary.errors) process.stderr.write(`${formatCheck(result.check, { color })}\n\n`);
       const media = result.files.filter(f => f !== "index.html" && !f.startsWith("fonts/")).length;
-      process.stdout.write(`Built ${displayPath(result.out)}/index.html (${plural(media, "media file")}). Open it in a browser to present.\n`);
-      if (result.url) process.stdout.write(`The closing view's QR code points to ${result.url}. Put this folder there for the audience.\n`);
+      const where = `${displayPath(result.out)}/index.html (${plural(media, "media file")})`;
+      if (!o["with-notes"]) {
+        process.stdout.write(`Built the audience copy: ${where}, with no speaker notes.\n`);
+        process.stdout.write(result.url
+          ? `Upload the folder to ${result.url}; the QR code at the end of the talk points there.\n`
+          : "To end the talk on a QR code for it, add `url:` to the deck, or build with --url.\n");
+      } else if (result.notes) {
+        process.stdout.write(`Built a copy to present from: ${where}, with speaker notes for ${plural(result.notes, "stop")}.\n`);
+        process.stderr.write("Anyone with this folder can read the notes, so don't upload it. The audience copy is `pathway build` without --with-notes.\n");
+      } else {
+        process.stdout.write(`Built ${where}.\n`);
+        process.stderr.write("There were no speaker notes to include: none in the deck, and no notes file.\n");
+      }
       if (result.skinFonts.length) process.stderr.write(`This build includes your skin's fonts (${result.skinFonts.join(", ")}). Check their licence before sharing it outside your organisation.\n`);
-      if (result.notes === 0) process.stderr.write("There were no speaker notes to include: none in the deck, and no notes file.\n");
-      else if (result.notes) process.stderr.write(`Speaker notes for ${plural(result.notes, "stop")} are included: anyone with this folder can read them.\n`);
       return 0;
     }
 

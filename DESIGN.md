@@ -231,6 +231,14 @@ present from (with notes) and the copy you hand off (without), so the code on sc
 is the code people scan. The QR library (`qrcode-generator`, MIT, no dependencies) runs
 at build time only; tests read every code back with a decoder.
 
+**One source, one build.** You present from the deck itself (`pathway present`), so
+notes come straight from the `.md`; you build only the copy you hand out. A talk is
+then the `.md` (with its media) and one build folder, and "which one do I upload?" has
+one answer. For a machine without Node, `build --with-notes` writes a copy to present
+from into its own folder (`<deck>-presenter/`, never `<deck>-build/`); if it is ever
+opened from a web address rather than from disk, it says on screen that its notes are
+exposed.
+
 ### 9. Offline and private by default
 
 A built deck makes zero network requests: no CDNs, no hosted fonts, no telemetry.

@@ -97,8 +97,9 @@ figcaption { font-family: var(--font-mono); color: var(--ink-2); }
 .touring #scrub { display: flex; }
 .touring #status { display: none; }
 #help {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100% - 32px)); box-sizing: border-box;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(820px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box;
   padding: 20px 22px; pointer-events: auto; font: 13px/1.5 var(--font-body); color: var(--ink); box-shadow: 0 20px 60px -20px var(--shadow);
+  z-index: 7;
 }
 #help[hidden] { display: none; }
 #help h3 { margin: 0 0 4px; font: 600 15px/1.2 var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; }
@@ -106,12 +107,18 @@ figcaption { font-family: var(--font-mono); color: var(--ink-2); }
 #help dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
 #help dt { font: 500 12px/1.6 var(--font-mono); color: var(--route); white-space: nowrap; }
 #help dd { margin: 0; color: var(--ink-2); }
+@media (min-width: 900px) { #help dl { grid-template-columns: auto 1fr auto 1fr; column-gap: 18px; } }
 #help p { margin: 12px 0 0; color: var(--ink-2); font-size: 12px; }
+#help p.intro { margin: 0 0 14px; font-size: 13px; color: var(--ink); }
 .help-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
 #btn-start { border-color: var(--route); color: var(--route); padding: 10px 14px; }
 .capture #hud { display: none !important; }
 #dev { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 5; max-width: min(720px, calc(100% - 32px)); padding: 10px 14px; font: 12px/1.5 var(--font-mono); color: var(--ink); pointer-events: auto; border-color: var(--route); }
-#dev[hidden] { display: none; }
+#dev[hidden], #exposed[hidden] { display: none; }
+#exposed { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 6; width: min(640px, calc(100% - 32px)); box-sizing: border-box; padding: 10px 14px; font: 13px/1.5 var(--font-body); color: var(--ink); border: 2px solid var(--route); pointer-events: auto; }
+#exposed b { color: var(--route); }
+#exposed code { font: 500 12px var(--font-mono); white-space: nowrap; }
+.capture #exposed { display: none !important; }
 #dev b { color: var(--route); }
 #dev ul { margin: 6px 0 0; padding-left: 1.2em; max-height: 30vh; overflow: auto; }
 

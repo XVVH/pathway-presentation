@@ -575,6 +575,12 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     updateHud();
   });
 
+  // ------------------------------------------------------------ a copy with notes, out in the world
+  // Notes belong on the presenter's machine. Opened from a web address (not from
+  // disk, nor from pathway present on this machine), a build with notes says so.
+  const local = location.protocol === "file:" || /^(localhost|127(\.\d+){3}|\[::1\])$/.test(location.hostname);
+  if (payload.notes && !payload.dev && !local) byId("exposed").hidden = false;
+
   // ------------------------------------------------------------ dev (pathway present)
   function showDev(extra: string[] = []): void {
     const errors = (payload.problems ?? []).filter(p => p.severity === "error");

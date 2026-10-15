@@ -85,12 +85,14 @@ export function buildHud(title: string, closing = ""): string {
     <div id="help" class="pill" role="dialog" aria-label="Keys">
       <h3>Legend</h3>
       <p class="deck-title">${esc(title)}</p>
+      <p class="intro">Explore the map: drag, zoom, and click any stop. Or walk the talk stop by stop with →.</p>
       <dl>${KEYS.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
       <p>Press ? to bring this back. On a narrow screen the route becomes a scrolling strip.</p>
-      <div class="help-actions"><button id="btn-start" type="button">Start →</button></div>
+      <div class="help-actions"><button id="btn-start" type="button">Walk the talk →</button></div>
     </div>
   </div>
   <div id="dev" class="pill" hidden></div>
+  <div id="exposed" class="pill" hidden role="alert"><b>This copy includes speaker notes</b>, so anyone with the link can read them. Upload the build made without <code>--with-notes</code> instead.</div>
   ${closing}
 </main>
 <div id="strip" aria-label="The route as a scrolling strip"></div>`;

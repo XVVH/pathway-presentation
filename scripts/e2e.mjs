@@ -244,6 +244,30 @@ await step("pathway present reloads the page when the deck changes, keeping your
   }
 });
 
+await step("a copy with notes, opened from a web address, warns; the audience copy doesn't", async () => {
+  const audience = buildDeck("examples/pathway/pathway.md", { out: join(tmp, "audience") });
+  for (const [folder, warns] of [[built.out, true], [audience.out, false]]) {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    // Serve the folder as if it were uploaded to the intranet.
+    await page.route("https://intranet.example.com/**", route => {
+      const path = new URL(route.request().url()).pathname.replace(/^\/talk\//, "") || "index.html";
+      const types = { html: "text/html", svg: "image/svg+xml", woff2: "font/woff2", mp4: "video/mp4" };
+      try { route.fulfill({ body: readFileSync(join(folder, path)), contentType: types[path.split(".").pop()] ?? "application/octet-stream" }); }
+      catch { route.fulfill({ status: 404 }); }
+    });
+    await page.goto("https://intranet.example.com/talk/index.html");
+    await page.waitForTimeout(400);
+    const shown = await page.locator("#exposed").isVisible();
+    expect(shown === warns, `${folder}: banner ${shown ? "shown" : "missing"}`);
+    if (warns) await shot(page, "11-notes-exposed");
+    await page.close();
+  }
+  const local = await context.newPage();
+  await local.goto(url);
+  expect(await local.locator("#exposed").isHidden(), "banner on a copy opened from disk");
+  await local.close();
+});
+
 await step("nothing left the machine and nothing broke", async () => {
   expect(!problems.length, problems.join("\n      "));
 });

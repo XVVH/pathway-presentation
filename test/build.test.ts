@@ -31,6 +31,13 @@ test("build: a folder with the page, the media it uses, and the skin's fonts", (
   assert.equal(payload.dev, false);
 });
 
+test("build: a copy with notes goes in its own folder, never the audience copy's", () => {
+  const dir = scratch({ "talk.md": "# T\n\n## A\nx\n\n::: notes\nSay hi.\n:::\n" });
+  assert.equal(buildDeck(join(dir, "talk.md")).out, join(dir, "talk-build"));
+  assert.equal(buildDeck(join(dir, "talk.md"), { withNotes: true }).out, join(dir, "talk-presenter"));
+  assert.equal(payloadOf(readFileSync(join(dir, "talk-build", "index.html"), "utf8")).notes, null);
+});
+
 test("build: notes go in only with --with-notes", () => {
   const out = join(mkdtempSync(join(tmpdir(), "pathway-out-")), "talk");
   buildDeck("examples/pathway/pathway.md", { out, withNotes: true });

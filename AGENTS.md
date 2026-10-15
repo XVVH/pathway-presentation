@@ -29,10 +29,12 @@ installed, say so rather than installing it unasked.
 - `pathway present deck.md` serves the deck on this machine (127.0.0.1), reloads it
   as the files change, and shows check errors over the page. Press P for the
   presenter window with the speaker notes.
-- `pathway build deck.md` writes `deck-build/`: open its `index.html` in any browser,
-  offline. It refuses a deck with errors (`--force` overrides). Speaker notes stay
-  out unless you pass `--with-notes`; don't add that flag unless the person asked,
-  since anyone with the folder can read them.
+- `pathway build deck.md` writes `deck-build/`, the audience copy: it opens offline
+  in any browser and never contains notes. It refuses a deck with errors (`--force`
+  overrides). Present from the `.md` with `pathway present`; only for a machine
+  without Node, `--with-notes` writes a copy to present from, in `deck-presenter/`.
+  Don't add that flag unless the person asked, and never upload that folder: anyone
+  with it can read the notes.
 - Keys: → next, ← back, ↓ detour, ↑ pull back, M map, P presenter, Q bottom line and
   QR code, V tour, R remote (for screen share), B blank, D dark or light, F full
   screen, ? help.

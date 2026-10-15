@@ -94,11 +94,15 @@ test("build: refuses a broken deck, builds a clean one, and says where", () => {
   writeFileSync(join(dir, "deck.md"), "# T\n\n## A\nFine.\n");
   const ok = run("build", join(dir, "deck.md"));
   assert.equal(ok.code, 0);
-  assert.match(ok.out, /Built .*deck-build\/index\.html \(0 media files\)/);
+  assert.match(ok.out, /Built the audience copy: .*deck-build\/index\.html \(0 media files\), with no speaker notes/);
+  assert.match(ok.out, /add `url:` to the deck/);
   assert.match(readFileSync(join(dir, "deck-build", "index.html"), "utf8"), /<title>T<\/title>/);
   assert.match(run("build", join(dir, "deck.md"), "--with-notes").err, /There were no speaker notes to include/);
   writeFileSync(join(dir, "deck.md"), "# T\n\n## A\nFine.\n\n::: notes\nSay hello.\n:::\n");
-  assert.match(run("build", join(dir, "deck.md"), "--with-notes").err, /Speaker notes for 1 stop are included/);
+  const presenter = run("build", join(dir, "deck.md"), "--with-notes");
+  assert.match(presenter.out, /Built a copy to present from: .*deck-presenter\/index\.html .* speaker notes for 1 stop/);
+  assert.match(presenter.err, /don't upload it/);
+  assert.match(run("build", join(dir, "deck.md"), "--url", "https://intranet.example.com/t/").out, /Upload the folder to https:\/\/intranet\.example\.com\/t\//);
 });
 
 test("fmt: prints, checks or rewrites", () => {

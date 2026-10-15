@@ -38,8 +38,9 @@ export interface BuildResult {
 
 const GENERATOR = '<meta name="generator" content="Pathway">';
 
-export function defaultOutDir(deckPath: string): string {
-  return join(dirname(deckPath), `${basename(deckPath).replace(/\.md$/i, "")}-build`);
+/** The audience copy goes in <deck>-build; a copy with notes, in <deck>-presenter, so the two never mix. */
+export function defaultOutDir(deckPath: string, withNotes = false): string {
+  return join(dirname(deckPath), `${basename(deckPath).replace(/\.md$/i, "")}-${withNotes ? "presenter" : "build"}`);
 }
 
 /** Only ever delete a folder Pathway built, or an empty one. */
@@ -60,7 +61,7 @@ function prepareOut(out: string, deckPath: string): void {
 export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResult {
   const check = checkDeck(deckPath, nodeIo, { notes: opts.withNotes ? opts.notes : null });
   if (check.summary.errors && !opts.force) return { check, out: null, files: [], notes: null, skinFonts: [], url: null };
-  const out = opts.out ?? defaultOutDir(deckPath);
+  const out = opts.out ?? defaultOutDir(deckPath, !!opts.withNotes);
   const { payload, media } = compileDeck(check, nodeIo, { notes: !!opts.withNotes, url: opts.url });
   const assets = loadAssets(check.skin);
   prepareOut(out, deckPath);
