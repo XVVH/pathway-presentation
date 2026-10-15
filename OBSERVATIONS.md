@@ -61,3 +61,60 @@ Possible fixes:
 - Say it when `present` starts: "Watching the deck: save and the page reloads
   where you were."
 - Show a brief "Updated" notice on the page after each reload.
+
+### Structuring a talk as a map takes a shift from slides
+
+*2026-10-15 · f18299d · first deck*
+
+The first real deck took a while to structure, coming from PowerPoint. It
+checked clean, but slide habits showed in its shape:
+
+- Trunk titles were topics ("Audience") rather than claims, so the whole map
+  reads as a list of sections instead of the argument.
+- Stops with only a title, used like section-divider slides. On a map the
+  branch already shows the grouping.
+- A stop whose only child is another stop: two hops where one would do.
+- The bottom line written as questions. Phones open on it and the talk ends on
+  it, so statements stick better.
+
+Possible fixes:
+
+- A short "Coming from PowerPoint" guide: a section slide becomes a trunk stop
+  that states its point, the appendix becomes detours, presenter notes become
+  `::: notes`.
+- Gentle `check` hints (info, not warnings) for title-only stops with children,
+  and for single-child chains.
+- The structuring skill discussed earlier: propose a map from a pile of content.
+
+### Lines written one under another run together on the card
+
+*2026-10-15 · f18299d · cards*
+
+Two short lines typed one under the other, with no blank line or bullets
+between them, render as one sentence: "Fast to write" and "Easy to change"
+become "Fast to write Easy to change". That's standard Markdown, but in
+PowerPoint every line is its own line, so it reads as a bug, and `check` says
+nothing.
+
+Possible fixes:
+
+- Treat a line break inside a paragraph as a line break on cards. This matches
+  what people expect from slides. It costs anyone who hard-wraps prose, which
+  `fmt` doesn't do.
+- Or keep Markdown's rule and have `check` flag paragraphs with line breaks in
+  them, with a safe fix that turns the lines into bullets.
+
+### The browser tab and the title card can disagree
+
+*2026-10-15 · f18299d · frontmatter*
+
+`title:` in the frontmatter names the page (the browser tab and the legend),
+while the `#` heading is the title card. In the first deck they said different
+things, and nothing pointed it out. The starter template asks for both, which
+invites it.
+
+Possible fixes:
+
+- Drop `title:` from the template and use the `#` heading everywhere, keeping
+  `title:` only for when the tab should differ.
+- Or an info note from `check` when the two differ.
