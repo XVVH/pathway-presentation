@@ -84,7 +84,10 @@ Possible fixes:
   `::: notes`.
 - Gentle `check` hints (info, not warnings) for title-only stops with children,
   and for single-child chains.
-- The structuring skill discussed earlier: propose a map from a pile of content.
+- A workflow skill that proposes a map from a pile of content, then reviews the
+  draft for exactly these habits, and for the run-together lines below. Applied
+  by hand to the first deck, these fixes took it from 21 stops to 19 and made
+  the whole map read as the argument.
 
 ### Lines written one under another run together on the card
 
@@ -118,3 +121,6 @@ Possible fixes:
 - Drop `title:` from the template and use the `#` heading everywhere, keeping
   `title:` only for when the tab should differ.
 - Or an info note from `check` when the two differ.
+
+Since then, the brand template (kept outside the repo) no longer sets `title:`.
+The `check` note is still open.
