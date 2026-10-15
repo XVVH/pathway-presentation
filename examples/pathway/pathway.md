@@ -14,6 +14,7 @@ A talk you travel through instead of paging through.
 - A deck is a map; the talk is one route through it.
 - Write it as plain Markdown. Pathway lays out the map.
 - Detours answer questions without losing your place.
+- Get it: [github.com/XVVH/pathway-presentation](https://github.com/XVVH/pathway-presentation)
 :::
 
 ::: notes
