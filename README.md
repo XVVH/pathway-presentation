@@ -8,6 +8,8 @@ talk is a route through it.
 - [examples/pathway/](examples/pathway/): a deck about Pathway, with notes and a
   bottom line.
 - [spike/](spike/): the motion prototype the engine grew from.
+- [OBSERVATIONS.md](OBSERVATIONS.md): friction noticed while using Pathway on real
+  talks.
 
 ## Install
 
