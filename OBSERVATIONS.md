@@ -5,11 +5,15 @@ entry says what happened and what we might do about it, and stays open until
 we decide. Describe the friction, never the talk: real content stays on the
 machine it was written on.
 
+Each entry starts with the date and the commit of Pathway it was seen on, so we
+can tell later whether a change fixed it. Find the commit in your Pathway clone
+with `git log -1 --format=%h`.
+
 ## Open
 
 ### The unknown-skin warning doesn't explain how to use your own skin
 
-*2026-10-15 · `pathway check`, `present`*
+*2026-10-15 · f18299d · `pathway check`, `present`*
 
 Writing the skin folder's name (`skin: brand-talks`) gives "Unknown skin
 'brand-talks'". The message does mention giving a path, but only at the end, and
@@ -26,7 +30,7 @@ Possible fixes:
 
 ### Where a talk sits relative to the template and skins is confusing
 
-*2026-10-15 · folder layout*
+*2026-10-15 · f18299d · folder layout*
 
 The brand template ships as one folder holding `skins/` and `template/`, with
 talks as folders next to them. In practice that reads as talks nested inside
@@ -46,7 +50,7 @@ Possible fixes, to weigh together with the first entry:
 
 ### Live reload in `present` wasn't obvious
 
-*2026-10-15 · `pathway present`*
+*2026-10-15 · f18299d · `pathway present`*
 
 The assumption was that the page only changes after a build. In fact, `present`
 re-checks and reloads on every save and keeps your place. The README says this,
