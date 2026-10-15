@@ -23,6 +23,7 @@ node src/cli.ts outline examples/pathway/pathway.md   # the map as a tree, and t
 node src/cli.ts fmt --write examples/pathway/pathway.md
 node src/cli.ts render examples/pathway/pathway.md --all   # PNGs (needs Playwright)
 node src/cli.ts inline-notes talk.md --write          # move a separate notes file into the deck
+node src/cli.ts new-skin ../skins/brand.css           # start your own skin: colours and fonts
 ```
 
 - `check` exits with 1 when the deck has errors (or warnings, with `--strict`).

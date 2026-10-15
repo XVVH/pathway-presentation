@@ -4,9 +4,12 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import { cardCss } from "./cardcss.ts";
 import { escapeHtml, payloadScript } from "./compile.ts";
 import type { Payload } from "./payload.ts";
+import type { ResolvedSkin } from "./skin.ts";
 
 const here = new URL(".", import.meta.url);
 /** Pathway's own files: the bundled engine, its CSS, and the skins with their fonts. */
@@ -16,16 +19,33 @@ export const SKINS_DIR = new URL("../skins/", here);
 export interface Assets {
   js: string;
   css: string;
-  /** Font files the skin uses, relative to skins/fonts. */
-  fonts: string[];
+  /** Font files to put beside the page: where each comes from, and its path in the build. */
+  fonts: { from: string; to: string; builtin: boolean }[];
 }
 
-export function loadAssets(skin: string): Assets {
-  const skinCss = readFileSync(new URL(`${skin}.css`, SKINS_DIR), "utf8");
-  const css = [skinCss, readFileSync(new URL("pathway.css", RUNTIME_DIR), "utf8"), cardCss()].join("\n");
+/** The page's CSS and fonts for a skin: the built-in base, then your skin file over it. */
+export function loadAssets(skin: ResolvedSkin): Assets {
+  const baseCss = readFileSync(new URL(`${skin.base}.css`, SKINS_DIR), "utf8");
+  const fonts: Assets["fonts"] = [...new Set([...baseCss.matchAll(/url\("fonts\/([^"]+)"\)/g)].map(m => m[1]))]
+    .map(f => ({ from: fileURLToPath(new URL(`fonts/${f}`, SKINS_DIR)), to: `fonts/${f}`, builtin: true }));
+  let skinCss = "";
+  if (skin.css) {
+    // Your skin's fonts go in fonts/skin/, and its CSS points there.
+    const urls = new Map<string, string>(), taken = new Set<string>();
+    for (const face of skin.faces) {
+      if (!face.path || urls.has(face.src)) continue;
+      const name = basename(face.path).replace(/[^\w.-]/g, "-");
+      let to = `fonts/skin/${name}`;
+      for (let k = 2; taken.has(to); k++) to = `fonts/skin/${k}-${name}`;
+      taken.add(to);
+      urls.set(face.src, to);
+      fonts.push({ from: face.path, to, builtin: false });
+    }
+    skinCss = skin.css.replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/g, (all, _q, src: string) => (urls.has(src) ? `url("${urls.get(src)}")` : all));
+  }
+  const css = [baseCss, skinCss, readFileSync(new URL("pathway.css", RUNTIME_DIR), "utf8"), cardCss()].filter(Boolean).join("\n");
   const js = readFileSync(new URL("pathway.js", RUNTIME_DIR), "utf8");
-  const fonts = [...skinCss.matchAll(/url\("fonts\/([^"]+)"\)/g)].map(m => m[1]);
-  return { js, css, fonts: [...new Set(fonts)] };
+  return { js, css, fonts };
 }
 
 export interface PageOptions {

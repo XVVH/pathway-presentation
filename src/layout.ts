@@ -3,9 +3,9 @@
 // spacing follows typography.ts. The renderer measures exactly; this estimate
 // is for the checker, and is calibrated against the browser in the tests.
 
-import { FACE_WIDTHS } from "./metrics.ts";
 import type { MediaRef, Run, Stop } from "./model.ts";
-import { CARD, DENSITY, SKINS, TYPE, type Density } from "./typography.ts";
+import type { SkinMetrics } from "./skin.ts";
+import { CARD, DENSITY, TYPE, type Density } from "./typography.ts";
 
 export interface Estimate {
   /** Card height as a fraction of its width, before snapping. */
@@ -21,7 +21,8 @@ export interface Estimate {
 }
 
 export interface EstimateOptions {
-  skin: string;
+  /** The skin's font widths: builtinMetrics(name), or a resolved skin's. */
+  metrics: SkinMetrics;
   density: Density;
   isRoot: boolean;
   /** Height over width for an image, if known. */
@@ -68,9 +69,9 @@ export function wrapLines(runs: readonly Run[], maxEm: number, faces: Faces, opt
 }
 
 export function estimateStop(stop: Stop, o: EstimateOptions): Estimate {
-  const skin = SKINS[o.skin] ?? SKINS.sectional;
-  const faces: Faces = { body: FACE_WIDTHS[skin.body], strong: FACE_WIDTHS[skin.strong], mono: FACE_WIDTHS[skin.mono] };
-  const display: Faces = { body: FACE_WIDTHS[skin.display], strong: FACE_WIDTHS[skin.display], mono: faces.mono };
+  const skin = o.metrics;
+  const faces: Faces = { body: skin.body, strong: skin.strong, mono: skin.mono };
+  const display: Faces = { body: skin.display, strong: skin.display, mono: faces.mono };
   const monoAdvance = charWidth(faces.mono, "0");
   const d = DENSITY[stop.density ?? o.density];
 

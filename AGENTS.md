@@ -51,7 +51,7 @@ my-talk/
 ```markdown
 ---
 title: Why Pipelines Stall
-skin: sectional          # or boardroom
+skin: sectional          # or boardroom, or the path of your own skin's .css
 density: talk            # or technical
 routes:
   exec: [intake, fix]    # named routes are lists of stop ids
@@ -112,6 +112,14 @@ Skipped by the route; one key away when someone asks. See [[intake]].
 - Links between stops: `[[stop-id]]` or `[[stop-id|link text]]`. On screen they
   take you there. Web links open in a new tab.
 - No raw HTML. It isn't rendered.
+
+### Skins
+
+`skin:` names a built-in skin (`sectional`, `boardroom`) or a skin file, by path
+from the deck's folder. `pathway new-skin brand.css` writes a starter that begins
+from Boardroom: set colours (light and dark), and fonts with `@font-face` pointing at
+font files beside the skin. Card sizes come from those files, so a skin's fonts
+change what fits. Re-run `pathway check` after changing a skin.
 
 ### Density
 
@@ -205,7 +213,8 @@ file into the deck.
   `no-id`, `duplicate-id`, `root-detour`, `bad-attribute`, `unknown-density`
 - **Frontmatter:** `frontmatter-unclosed`, `frontmatter-yaml`, `frontmatter-type`,
   `route-format`, `route-empty`, `route-unknown-stop`
-- **References:** `broken-link`, `missing-media`, `notes-file-missing`
+- **References:** `broken-link`, `missing-media`, `notes-file-missing`,
+  `skin-not-found`, `skin-font-missing`
 - **Density:** `stop-overflow`
 
 **Warnings** (the deck works, but something is off):
@@ -218,5 +227,7 @@ file into the deck.
   `media-outside-deck`, `unsupported-media`
 - **Names and keys:** `unknown-attribute`, `unknown-frontmatter-key`,
   `unknown-skin`, `route-duplicate-stop`, `raw-html`
+- **Skins:** `skin-base-unknown`, `skin-font-unmeasured`, `skin-font-unreadable`,
+  `skin-bend-unknown` (and `skin-font-variable`, for information)
 - **Notes:** `notes-unclosed`, `notes-orphan`, `notes-ambiguous`, `notes-duplicate`,
   `notes-preamble`

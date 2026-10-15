@@ -28,6 +28,8 @@ export interface BuildResult {
   files: string[];
   /** How many stops' notes went in; null when notes were left out. */
   notes: number | null;
+  /** Your skin's own font files, which may not be licensed for sharing outside your organisation. */
+  skinFonts: string[];
 }
 
 const GENERATOR = '<meta name="generator" content="Pathway">';
@@ -53,10 +55,10 @@ function prepareOut(out: string, deckPath: string): void {
 
 export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResult {
   const check = checkDeck(deckPath, nodeIo, { notes: opts.withNotes ? opts.notes : null });
-  if (check.summary.errors && !opts.force) return { check, out: null, files: [], notes: null };
+  if (check.summary.errors && !opts.force) return { check, out: null, files: [], notes: null, skinFonts: [] };
   const out = opts.out ?? defaultOutDir(deckPath);
   const { payload, media } = compileDeck(check, nodeIo, { notes: !!opts.withNotes });
-  const assets = loadAssets(payload.skin);
+  const assets = loadAssets(check.skin);
   prepareOut(out, deckPath);
 
   const files: string[] = [];
@@ -75,11 +77,15 @@ export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResul
   write("index.html", renderPage(payload, assets));
   const deckDir = dirname(deckPath);
   for (const rel of media) copy(join(deckDir, rel), rel);
+  for (const f of assets.fonts) copy(f.from, f.to);
+  // The built-in fonts' licence travels with them.
   const fontsDir = fileURLToPath(new URL("fonts/", SKINS_DIR));
-  for (const f of assets.fonts) copy(join(fontsDir, f), `fonts/${f}`);
-  // The fonts' licence travels with them.
-  for (const f of readdirSync(fontsDir).filter(f => f.startsWith("OFL"))) copy(join(fontsDir, f), `fonts/${f}`);
-  return { check, out, files: files.map(f => f.split(sep).join("/")), notes: payload.notes ? Object.keys(payload.notes).length : null };
+  if (assets.fonts.some(f => f.builtin)) for (const f of readdirSync(fontsDir).filter(f => f.startsWith("OFL"))) copy(join(fontsDir, f), `fonts/${f}`);
+  return {
+    check, out, files: files.map(f => f.split(sep).join("/")),
+    notes: payload.notes ? Object.keys(payload.notes).length : null,
+    skinFonts: assets.fonts.filter(f => !f.builtin).map(f => basename(f.from)),
+  };
 }
 
 /** A path for messages: relative to the working directory when that's shorter. */

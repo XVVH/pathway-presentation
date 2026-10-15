@@ -8,6 +8,7 @@ import { imageSize } from "./media.ts";
 import type { Deck, Diagnostic, Edit, Fix, Notes, Stop } from "./model.ts";
 import { defaultNotesPath, parseNotes } from "./notes.ts";
 import { parseDeck } from "./parse.ts";
+import { resolveSkin, type ResolvedSkin } from "./skin.ts";
 import { closest, plural, slugify } from "./text.ts";
 import { DENSITY } from "./typography.ts";
 
@@ -28,6 +29,7 @@ export interface Summary {
 
 export interface CheckResult {
   deck: Deck;
+  skin: ResolvedSkin;
   notes: Notes | null;
   estimates: Map<string, Estimate>;
   diagnostics: Diagnostic[];
@@ -123,13 +125,17 @@ export function checkDeck(deckPath: string, io: Io, opts: CheckOptions = {}): Ch
     }
   }
 
+  // The skin, and its fonts' widths, which every size estimate depends on.
+  const skin = resolveSkin(deck.meta.skin, file, io, deck.meta.skinLine);
+  for (const d of skin.diagnostics) if (!out.some(o => o.code === d.code && o.message === d.message)) out.push(d);
+
   // How much each stop holds: an error when it can't fit, a warning when it's
   // more than people can read while listening.
   const estimates = new Map<string, Estimate>();
   for (const stop of deck.stops) {
     const density = stop.density ?? deck.meta.density;
     const spec = DENSITY[density];
-    const est = estimateStop(stop, { skin: deck.meta.skin, density, isRoot: stop === deck.root, aspect: m => aspectOf(m.src) });
+    const est = estimateStop(stop, { metrics: skin.metrics, density, isRoot: stop === deck.root, aspect: m => aspectOf(m.src) });
     estimates.set(stop.id, est);
     const advice = splitAdvice(stop, deck, file);
     if (est.overflow) {
@@ -214,7 +220,7 @@ export function checkDeck(deckPath: string, io: Io, opts: CheckOptions = {}): Ch
   const noted = new Set([...deck.stops.filter(st => st.notes.length).map(st => st.id), ...(notes?.sections.filter(n => n.matched).map(n => n.id) ?? [])]);
   const anyNotes = !!notes || deck.stops.some(st => st.notes.length);
   return {
-    deck, notes, estimates, diagnostics: out,
+    deck, skin, notes, estimates, diagnostics: out,
     summary: {
       errors: count("error"), warnings: count("warning"), infos: count("info"),
       stops: deck.stops.length, detours: deck.stops.filter(s => s.detour).length,

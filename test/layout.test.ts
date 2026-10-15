@@ -10,6 +10,7 @@ import { estimateStop, wrapLines } from "../src/layout.ts";
 import { imageSize } from "../src/media.ts";
 import { FACE_WIDTHS } from "../src/metrics.ts";
 import { parseDeck } from "../src/parse.ts";
+import { builtinMetrics } from "../src/skin.ts";
 import { CARD } from "../src/typography.ts";
 
 interface Calibration { deck: string; measured: Record<string, { title: string; ratio: number }[]> }
@@ -28,7 +29,7 @@ for (const c of calibration) {
       const misses: string[] = [];
       deck.stops.forEach((stop, i) => {
         const browser = cards[i].ratio;
-        const est = estimateStop(stop, { skin, density: stop.density ?? deck.meta.density, isRoot: stop === deck.root, aspect: m => aspect(m.src) });
+        const est = estimateStop(stop, { metrics: builtinMetrics(skin), density: stop.density ?? deck.meta.density, isRoot: stop === deck.root, aspect: m => aspect(m.src) });
         const tol = browser > CARD.ratioMax ? TOLERANCE.over : TOLERANCE.fits;
         if (Math.abs(est.ratio - browser) > tol) misses.push(`${stop.title}: browser ${browser}, estimate ${est.ratio.toFixed(4)}`);
         // Overflow verdicts must agree whenever the browser isn't right at the cap.

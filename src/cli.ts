@@ -1,6 +1,7 @@
 // The `pathway` command.
 
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { buildDeck, displayPath } from "./build.ts";
 import { checkDeck, type CheckResult } from "./check.ts";
@@ -9,7 +10,10 @@ import { formatDeck } from "./fmt.ts";
 import { planInlineNotes } from "./inline-notes.ts";
 import { checkJson, formatCheck, formatOutline, outlineJson } from "./format.ts";
 import { nodeIo } from "./io-node.ts";
+import { SKINS_DIR } from "./page.ts";
+import { starterSkin } from "./skin.ts";
 import { plural } from "./text.ts";
+import { SKINS } from "./typography.ts";
 
 const HELP = `Usage: pathway <command> <deck.md> [options]
 
@@ -23,6 +27,8 @@ Commands
   build <deck.md>     Make a folder to present from anywhere, offline: open its
                       index.html in a browser. Notes stay out unless asked for.
   fmt <file.md>...    Tidy a deck's layout without changing what it says.
+  new-skin <file.css>  Start your own skin: colours, fonts and motion, from a
+                      built-in skin (--from, default boardroom).
   inline-notes <deck.md>
                       Move a separate notes file into the deck, as ::: notes
                       blocks under each stop. Shows what would move; --write
@@ -50,11 +56,12 @@ Options
   --size <WxH>        render: picture size in px (default 1280x720).
   --scale <n>         render: pixel density (default 1; 2 for sharper).
   --theme <name>      render: dark or light (default: light).
+  --from <skin>       new-skin: the built-in skin to start from.
   -h, --help          Show this help.
   -v, --version       Show the version.
 `;
 
-const COMMANDS = ["check", "outline", "present", "build", "fmt", "render", "inline-notes"];
+const COMMANDS = ["check", "outline", "present", "build", "fmt", "render", "inline-notes", "new-skin"];
 
 async function main(argv: string[]): Promise<number> {
   let parsed;
@@ -67,7 +74,7 @@ async function main(argv: string[]): Promise<number> {
         out: { type: "string" }, "with-notes": { type: "boolean" }, force: { type: "boolean" },
         port: { type: "string" }, write: { type: "boolean" }, check: { type: "boolean" },
         stop: { type: "string", multiple: true }, map: { type: "boolean" }, all: { type: "boolean" },
-        size: { type: "string" }, scale: { type: "string" }, theme: { type: "string" },
+        size: { type: "string" }, scale: { type: "string" }, theme: { type: "string" }, from: { type: "string" },
         help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
       },
     });
@@ -87,6 +94,18 @@ async function main(argv: string[]): Promise<number> {
   const usage = (msg: string) => { process.stderr.write(`${msg}\n\n${HELP}`); return 2; };
   if (!files.length) return usage(`${command} needs a file.`);
   if (command !== "fmt" && files.length > 1) return usage(`${command} takes one deck file.`);
+  if (command === "new-skin") {
+    const [target] = files;
+    const base = o.from ?? "boardroom";
+    if (!SKINS[base]) return usage(`--from must be a built-in skin: ${Object.keys(SKINS).join(", ")}.`);
+    if (!/\.css$/i.test(target)) return usage("A skin is a .css file, like brand.css.");
+    if (nodeIo.exists(target)) { process.stderr.write(`${target} already exists. Choose another name, or edit it.\n`); return 1; }
+    const baseCss = readFileSync(new URL(`${base}.css`, SKINS_DIR), "utf8");
+    mkdirSync(dirname(target) || ".", { recursive: true });
+    writeFileSync(target, starterSkin(baseCss, base));
+    process.stdout.write(`Wrote ${target}, starting from ${base}. Use it from a deck with \`skin: <path to it>\` in the frontmatter.\n`);
+    return 0;
+  }
   for (const f of files) if (!nodeIo.exists(f)) { process.stderr.write(`Can't find ${f}.\n`); return 2; }
   const color = !o.json && !!process.stderr.isTTY && !process.env.NO_COLOR;
   const deckPath = files[0];
@@ -129,6 +148,7 @@ async function main(argv: string[]): Promise<number> {
       if (result.check.summary.warnings || result.check.summary.errors) process.stderr.write(`${formatCheck(result.check, { color })}\n\n`);
       const media = result.files.filter(f => f !== "index.html" && !f.startsWith("fonts/")).length;
       process.stdout.write(`Built ${displayPath(result.out)}/index.html (${plural(media, "media file")}). Open it in a browser to present.\n`);
+      if (result.skinFonts.length) process.stderr.write(`This build includes your skin's fonts (${result.skinFonts.join(", ")}). Check their licence before sharing it outside your organisation.\n`);
       if (result.notes === 0) process.stderr.write("There were no speaker notes to include: none in the deck, and no notes file.\n");
       else if (result.notes) process.stderr.write(`Speaker notes for ${plural(result.notes, "stop")} are included: anyone with this folder can read them.\n`);
       return 0;

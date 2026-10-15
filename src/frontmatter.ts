@@ -53,8 +53,10 @@ export function readFrontmatter(lines: readonly string[], file: string, diagnost
   }
   if (typeof data.title === "string") meta.title = data.title;
   if (data.skin !== undefined) {
-    if (typeof data.skin === "string" && SKINS[data.skin]) meta.skin = data.skin;
-    else diagnostics.push({ code: "unknown-skin", severity: "warning", file, line: keyLine("skin"), message: `Unknown skin '${String(data.skin)}'. Built-in skins: ${Object.keys(SKINS).join(", ")}. Using ${DEFAULT_SKIN}.` });
+    meta.skinLine = keyLine("skin");
+    // A built-in skin by name, or your own skin file by path (anything ending in .css).
+    if (typeof data.skin === "string" && (SKINS[data.skin] || /\.css$/i.test(data.skin.trim()))) meta.skin = data.skin.trim();
+    else diagnostics.push({ code: "unknown-skin", severity: "warning", file, line: keyLine("skin"), message: `Unknown skin '${String(data.skin)}'. Built-in skins: ${Object.keys(SKINS).join(", ")}; or give the path of your own skin's .css file. Using ${DEFAULT_SKIN}.` });
   }
   if (data.density !== undefined) {
     if (DENSITIES.includes(data.density as Density)) meta.density = data.density as Density;

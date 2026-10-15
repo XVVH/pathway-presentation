@@ -89,8 +89,8 @@ test("card CSS is written from typography.ts", () => {
 });
 
 test("page: one self-contained file whose policy blocks the network", () => {
-  const { payload } = compileDeck(checkDeck("examples/pathway/pathway.md", nodeIo), nodeIo);
-  const html = renderPage(payload, loadAssets(payload.skin));
+  const r = checkDeck("examples/pathway/pathway.md", nodeIo);
+  const html = renderPage(compileDeck(r, nodeIo).payload, loadAssets(r.skin));
   const csp = /http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)![1];
   assert.match(csp, /default-src 'none'/);
   assert.match(csp, /script-src 'sha256-[A-Za-z0-9+/=]+'/);

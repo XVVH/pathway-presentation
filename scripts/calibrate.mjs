@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { checkDeck } from "../src/check.ts";
 import { compileDeck } from "../src/compile.ts";
 import { estimateStop } from "../src/layout.ts";
+import { builtinMetrics, resolveSkin } from "../src/skin.ts";
 import { imageSize } from "../src/media.ts";
 import { nodeIo } from "../src/io-node.ts";
 import { loadAssets, renderPage } from "../src/page.ts";
@@ -36,13 +37,14 @@ for (const deckPath of decks) {
   for (const skin of SKINS) {
     const check = checkDeck(deckPath, nodeIo, { notes: null });
     check.deck.meta.skin = skin;
+    check.skin = resolveSkin(skin, deckPath, nodeIo);
     const { payload, media } = compileDeck(check, nodeIo);
-    const assets = loadAssets(skin);
+    const assets = loadAssets(check.skin);
     const scratch = mkdtempSync(join(tmpdir(), "pathway-calibrate-"));
     writeFileSync(join(scratch, "index.html"), renderPage(payload, assets));
     for (const rel of media) { mkdirSync(dirname(join(scratch, rel)), { recursive: true }); copyFileSync(join(dirname(deckPath), rel), join(scratch, rel)); }
     mkdirSync(join(scratch, "fonts"));
-    for (const f of assets.fonts) copyFileSync(join(root, "skins/fonts", f), join(scratch, "fonts", f));
+    for (const f of assets.fonts) { mkdirSync(dirname(join(scratch, f.to)), { recursive: true }); copyFileSync(f.from, join(scratch, f.to)); }
     const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     await tab.goto(`${pathToFileURL(join(scratch, "index.html")).href}?capture`);
     await tab.evaluate(() => window.pathway.ready);
@@ -65,7 +67,7 @@ for (const r of results) {
     console.log(`\n${r.deck} · ${skin}`);
     deck.stops.forEach((stop, i) => {
       const m = r.measured[skin][i];
-      const est = estimateStop(stop, { skin, density: stop.density ?? deck.meta.density, isRoot: stop === deck.root, aspect: media => { const b = nodeIo.head(nodeIo.join(dir, media.src), 65536); const s = b && imageSize(b); return s ? s.height / s.width : null; } });
+      const est = estimateStop(stop, { metrics: builtinMetrics(skin), density: stop.density ?? deck.meta.density, isRoot: stop === deck.root, aspect: media => { const b = nodeIo.head(nodeIo.join(dir, media.src), 65536); const s = b && imageSize(b); return s ? s.height / s.width : null; } });
       const diff = est.ratio - m.ratio;
       worst = Math.max(worst, Math.abs(diff));
       console.log(`  ${(diff >= 0 ? "+" : "") + diff.toFixed(3)}  browser ${m.ratio.toFixed(3)}  estimate ${est.ratio.toFixed(3)}  ${stop.title}${m.title.toLowerCase() !== stop.title.toLowerCase() ? `  (MISMATCH: ${m.title})` : ""}`);

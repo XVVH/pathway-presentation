@@ -243,6 +243,24 @@ heights, since its fonts set differently. So the skin is chosen when the deck is
 built, and the map is fixed from then on. The audience can still switch between light
 and dark (D).
 
+**Your own skin** is a CSS file the deck names by path (`skin: ../skins/brand.css`),
+for a day-job palette or a client's. `pathway new-skin brand.css` writes a starter.
+
+- It starts from a built-in skin (`--base-skin`), and overrides whatever it sets:
+  colours in light and dark, fonts, terrain, motion and `--bend`.
+- Fonts are files beside the skin, declared with `@font-face`. The checker reads each
+  file's advance widths directly (TrueType, OpenType, WOFF, WOFF2), so card sizes for
+  a brand font are as accurate as for the built-in ones, with no browser and no
+  measuring step. For the built-in fonts, the widths read from the files match the
+  browser-measured tables exactly; for a TrueType stand-in "brand" font, estimates
+  matched the browser within 0.0013 of card width on every card of the example.
+- Builds copy the skin's fonts into `fonts/skin/` and say so, since a brand font may
+  be licensed for internal use only. Brand fonts never belong in this repository:
+  keep the skin beside your talks.
+- A family the skin doesn't supply (say, a system font) can't be measured, and might
+  not be on the presenting machine; the checker warns and estimates with the base
+  skin's fonts.
+
 ### 10a. Cards fit their content, within a system
 
 - **Width is fixed per level** (trunk, branch, deeper). That keeps line length, the
@@ -456,10 +474,9 @@ From the first review:
 5. Can Node run on the work machine, or does the browser-hosted compiler come first?
    A built deck needs only a browser, so building elsewhere and copying the folder
    in works today; a browser-hosted compiler would let you edit there too.
-7. Custom skins: a `skin: ./brand.css` path in the frontmatter, for a day-job palette,
-   with a check that its fonts have measured widths.
 6. How far down does semantic zoom go: should diagrams have stations inside them
    ("zoom into the API Gateway box")?
+7. ~~Custom skins~~: `skin: ./brand.css` in the frontmatter; see 10.
 
 ## Build plan
 

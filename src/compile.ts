@@ -8,7 +8,7 @@ import { imageSize } from "./media.ts";
 import type { Deck, MediaRef, Stop } from "./model.ts";
 import type { Payload, PayloadFigure, PayloadRoute, PayloadStop, Target } from "./payload.ts";
 import { defaultRoute } from "./routes.ts";
-import { CARD, DEFAULT_SKIN, SKINS } from "./typography.ts";
+import { CARD } from "./typography.ts";
 
 export interface CompileOptions {
   /** Include speaker notes. Off unless asked for: notes are private. */
@@ -51,7 +51,6 @@ export function compileDeck(result: CheckResult, io: Io, opts: CompileOptions = 
   const { deck } = result;
   const root = deck.root;
   if (!root) throw new Error("The deck has no # title, so there's nowhere for the route to start.");
-  const skin = SKINS[deck.meta.skin] ? deck.meta.skin : DEFAULT_SKIN;
   const titles = new Map(deck.stops.map(s => [s.id, s.title]));
   const route: Target[] = defaultRoute(deck);
   const numbers = new Map<string, number>();
@@ -95,7 +94,7 @@ export function compileDeck(result: CheckResult, io: Io, opts: CompileOptions = 
 
   return {
     payload: {
-      version: 1, title: deck.meta.title ?? root.title, skin, bend: SKINS[skin].bend,
+      version: 1, title: deck.meta.title ?? root.title, skin: result.skin.file ? `custom (${result.skin.base})` : result.skin.base, bend: result.skin.bend,
       stops, route, routes, notes, dev: !!opts.dev,
     },
     media: [...media].sort(),

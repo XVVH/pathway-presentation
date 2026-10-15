@@ -124,7 +124,9 @@ export interface NamedRoute {
 
 export interface DeckMeta {
   title?: string;
+  /** A built-in skin's name, or the path of a skin file, relative to the deck. */
   skin: string;
+  skinLine?: number;
   density: Density;
   routes: NamedRoute[];
   notes?: string;

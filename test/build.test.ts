@@ -129,3 +129,29 @@ test("fmt: the example deck is already tidy", () => {
     assert.equal(formatDeck(s), s, f);
   }
 });
+
+test("present: serves your skin's fonts, and not the rest of its folder", async () => {
+  const dir = scratch({
+    "talk/deck.md": "---\nskin: ../brand/brand.css\n---\n# T\n\n## A\nx\n",
+    "brand/brand.css": `@font-face { font-family: "Brand"; src: url("Brand.woff2"); } :root { --font-body: "Brand"; }`,
+    "brand/secret.txt": "no",
+  });
+  writeFileSync(join(dir, "brand/Brand.woff2"), readFileSync("skins/fonts/barlow-latin-400-normal.woff2"));
+  const p = await present(join(dir, "talk/deck.md"), { port: 0 });
+  try {
+    assert.equal((await fetch(new URL("/fonts/skin/Brand.woff2", p.url))).status, 200);
+    assert.equal((await fetch(new URL("/fonts/skin/secret.txt", p.url))).status, 404);
+    assert.match(await (await fetch(p.url)).text(), /url\("fonts\/skin\/Brand\.woff2"\)/);
+    // Editing the skin, outside the deck's folder, reloads the page.
+    const reader = (await fetch(new URL("/__pathway/events", p.url))).body!.getReader();
+    await reader.read();
+    writeFileSync(join(dir, "brand/brand.css"), `@font-face { font-family: "Brand"; src: url("Brand.woff2"); } :root { --font-body: "Brand"; --route: red; }`);
+    const deadline = Date.now() + 5000;
+    let text = "";
+    while (!text.includes("event: reload") && Date.now() < deadline) text += new TextDecoder().decode((await reader.read()).value);
+    assert.match(text, /event: reload/);
+    await reader.cancel();
+  } finally {
+    await p.close();
+  }
+});

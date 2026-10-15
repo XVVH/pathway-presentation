@@ -133,3 +133,20 @@ test("inline-notes: shows what would move, then moves it and removes the empty n
   assert.match(readFileSync(join(dir, "deck.md"), "utf8"), /## B\nTwo\.\n\n::: notes\nSay two\.\n:::\n$/);
   assert.equal(run("inline-notes", join(dir, "deck.md")).code, 1, "nothing left to move");
 });
+
+test("new-skin, then a build that carries the skin's fonts and says so", () => {
+  const dir = scratch({ "deck.md": "---\nskin: skins/brand.css\n---\n# T\n\n## A\nx\n" });
+  assert.equal(run("new-skin", join(dir, "skins", "brand.css")).code, 0);
+  assert.equal(run("new-skin", join(dir, "skins", "brand.css")).code, 1, "never overwrites");
+  assert.equal(run("new-skin", join(dir, "x.css"), "--from", "nope").code, 2);
+  const starter = readFileSync(join(dir, "skins", "brand.css"), "utf8");
+  assert.match(starter, /--base-skin: boardroom;/);
+  assert.equal(run("check", join(dir, "deck.md")).code, 0, "the starter checks clean");
+  writeFileSync(join(dir, "skins", "Brand-Bold.woff2"), readFileSync("skins/fonts/barlow-condensed-latin-600-normal.woff2"));
+  writeFileSync(join(dir, "skins", "brand.css"), `@font-face { font-family: "Brand"; src: url("Brand-Bold.woff2"); font-weight: 700; }\n${starter.replace('--font-display: "IBM Plex Sans"', '--font-display: "Brand"')}`);
+  const built = run("build", join(dir, "deck.md"));
+  assert.equal(built.code, 0, built.err);
+  assert.match(built.err, /includes your skin's fonts \(Brand-Bold\.woff2\)\. Check their licence/);
+  assert.ok(existsSync(join(dir, "deck-build", "fonts", "skin", "Brand-Bold.woff2")));
+  assert.match(readFileSync(join(dir, "deck-build", "index.html"), "utf8"), /src: url\("fonts\/skin\/Brand-Bold\.woff2"\)/);
+});

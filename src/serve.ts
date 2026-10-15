@@ -5,14 +5,13 @@
 
 import { createReadStream, existsSync, statSync, watch, type FSWatcher } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { checkDeck, type CheckResult } from "./check.ts";
 import { compileDeck } from "./compile.ts";
 import { escapeHtml } from "./html.ts";
 import { nodeIo } from "./io-node.ts";
 import { extension } from "./media.ts";
-import { loadAssets, renderPage, SKINS_DIR } from "./page.ts";
+import { loadAssets, renderPage } from "./page.ts";
 
 const TYPES: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif", svg: "image/svg+xml",
@@ -40,7 +39,6 @@ interface Built {
 
 export function present(deckPath: string, opts: PresentOptions): Promise<Presenting> {
   const deckDir = dirname(resolve(deckPath));
-  const fontsDir = fileURLToPath(new URL("fonts/", SKINS_DIR));
   let built: Built | null = null;
   const clients = new Set<ServerResponse>();
   let port = opts.port;
@@ -52,6 +50,8 @@ export function present(deckPath: string, opts: PresentOptions): Promise<Present
   function build(reason: "start" | "change"): void {
     const check = checkDeck(deckPath, nodeIo, { notes: opts.notes });
     opts.onCheck?.(check, reason);
+    // A skin kept outside the deck's folder reloads the page too.
+    if (check.skin.file) watchFolder(dirname(resolve(check.skin.file)));
     const files = new Map<string, string>();
     let html: string;
     if (!check.deck.root) {
@@ -60,10 +60,10 @@ export function present(deckPath: string, opts: PresentOptions): Promise<Present
       const { payload, media } = compileDeck(check, nodeIo, { notes: true, dev: true });
       payload.problems = check.diagnostics.filter(d => d.file === check.deck.file && d.severity !== "info")
         .map(d => ({ severity: d.severity as "error" | "warning", line: d.line, message: d.message }));
-      const assets = loadAssets(payload.skin);
+      const assets = loadAssets(check.skin);
       html = renderPage(payload, assets, { connect: true });
       for (const rel of media) files.set(rel.split("/").map(encodeURIComponent).join("/"), join(deckDir, rel));
-      for (const f of assets.fonts) files.set(`fonts/${encodeURIComponent(f)}`, join(fontsDir, f));
+      for (const f of assets.fonts) files.set(f.to.split("/").map(encodeURIComponent).join("/"), f.from);
     }
     built = { html, files };
   }
@@ -101,6 +101,12 @@ export function present(deckPath: string, opts: PresentOptions): Promise<Present
   // Reload on changes. Editors save in several steps, so wait for them to settle.
   let timer: NodeJS.Timeout | null = null;
   const watchers: FSWatcher[] = [];
+  const watched = new Set<string>();
+  function watchFolder(dir: string): void {
+    if (watched.has(dir) || dir === deckDir || dir.startsWith(deckDir + sep)) return;
+    watched.add(dir);
+    try { watchers.push(watch(dir, (_e, name) => changed(name ? String(name) : null))); } catch { /* gone; the checker says so */ }
+  }
   const changed = (name: string | null) => {
     if (name && /(^|[\\/])(\.|node_modules|[^\\/]*-build([\\/]|$))/.test(name)) return;
     if (timer) clearTimeout(timer);
