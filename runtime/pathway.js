@@ -290,6 +290,9 @@
     const cw = Math.max(1, Math.floor(Math.min(vw * (vw < vh ? 0.86 : 0.6), frame.h * 0.8 * 1.6)));
     return { vw, vh, frame, cw };
   }
+  function besidePanel(v, panel) {
+    return { ...v, frame: { ...v.frame, w: Math.max(120, v.frame.w - (panel.right ?? 0)), h: Math.max(120, v.frame.h - (panel.bottom ?? 0)) } };
+  }
   function camFor(v, cx, cy, k) {
     const fx = v.frame.x + v.frame.w / 2, fy = v.frame.y + v.frame.h / 2;
     return { x: cx - (fx - v.vw / 2) / k, y: cy - (fy - v.vh / 2) / k, w: v.vw / k };
@@ -737,11 +740,26 @@
     ["V", "Play the route by itself, with a scrubber."],
     ["R", "Remote mode: quicker, flatter moves for screen share."],
     ["B", "Blank the screen. Any key brings it back."],
+    ["Q", "The bottom line, and the code to take this talk home on a phone."],
     ["D", "Dark or light."],
     ["F", "Full screen."],
     ["Drag, wheel, pinch", "Explore freely. Click any stop to look at it; → comes back."]
   ];
-  function buildHud(title) {
+  function shortUrl(url) {
+    try {
+      const u = new URL(url);
+      return `${u.host}${u.pathname.replace(/\/$/, "")}${u.search}`;
+    } catch {
+      return url;
+    }
+  }
+  function handoffHtml(takeaways, handoff) {
+    if (!takeaways && !handoff) return "";
+    const bottom = takeaways ? `<section class="bottom-line"><h3>The bottom line</h3><div class="md">${takeaways}</div></section>` : "";
+    const code = handoff ? `<section class="take-home"><div class="qr">${handoff.qr}</div><p class="url">${esc(shortUrl(handoff.url))}</p><p class="hint">Scan to explore this talk on your phone.</p></section>` : "";
+    return `<aside id="handoff" class="pill" aria-label="The bottom line, and this talk to take home">${bottom}${code}</aside>`;
+  }
+  function buildHud(title, closing = "") {
     return `
 <main id="stage" tabindex="0" aria-label="${esc(title)}: a map of the talk. Use the arrow keys to travel.">
   <canvas id="ground"></canvas>
@@ -782,6 +800,7 @@
     </div>
   </div>
   <div id="dev" class="pill" hidden></div>
+  ${closing}
 </main>
 <div id="strip" aria-label="The route as a scrolling strip"></div>`;
   }
@@ -796,6 +815,7 @@
       scrubTime: byId("scrub-time"),
       play: byId("btn-play"),
       dev: byId("dev"),
+      handoff: document.getElementById("handoff"),
       buttons: {
         tour: byId("btn-tour"),
         motion: byId("btn-motion"),
@@ -1009,11 +1029,13 @@
     raf = 0;
     onOpenMap;
     reducedMotion;
-    constructor(el, map, onOpenMap, reducedMotion) {
+    bottomLine;
+    constructor(el, map, onOpenMap, reducedMotion, bottomLine) {
       this.el = el;
       this.map = map;
       this.onOpenMap = onOpenMap;
       this.reducedMotion = reducedMotion;
+      this.bottomLine = bottomLine;
     }
     build() {
       if (this.built) return;
@@ -1040,7 +1062,7 @@
       this.el.innerHTML = `
       <div class="s-bar"><div class="s-crumb" id="s-crumb"></div><button type="button" id="s-map">Map</button></div>
       <div class="s-col">
-        <header class="s-hero"><div class="eyebrow"><span class="num">${stations} stops</span><span>Scroll to walk the route</span></div><h1>${esc(map.root.stop.title)}</h1><div class="md">${map.root.stop.body}</div></header>
+        <header class="s-hero"><div class="eyebrow"><span class="num">${stations} stops</span><span>Scroll to walk the route</span></div><h1>${esc(map.root.stop.title)}</h1><div class="md">${map.root.stop.body}</div>${this.bottomLine ? `<section class="s-bottom-line"><h2>The bottom line</h2><div class="md">${this.bottomLine}</div></section>` : ""}</header>
         <div class="s-trail" id="s-trail"><svg class="s-rail" id="s-rail" aria-hidden="true"></svg>${parts.join("")}</div>
         <footer class="s-end"><p>End of the route</p><button type="button" id="s-whole">See the whole map</button></footer>
       </div>`;
@@ -1360,7 +1382,7 @@
     const nav = new Navigator(map, routes);
     const wantRoute = params.get("route");
     if (wantRoute && routes.has(wantRoute)) nav.useRoute(wantRoute);
-    document.body.insertAdjacentHTML("afterbegin", buildHud(payload.title));
+    document.body.insertAdjacentHTML("afterbegin", buildHud(payload.title, handoffHtml(payload.takeaways, payload.handoff)));
     document.body.insertAdjacentHTML("beforeend", '<div id="blank" aria-hidden="true"></div>');
     const hud = hudRefs();
     const stage = byId("stage"), worldEl = byId("world");
@@ -1384,13 +1406,20 @@
       ground.resize(vp.vw, vp.vh, dpr);
     }
     measure();
+    let handoffOverride = null;
+    const isClosing = (t) => !!hud.handoff && t.kind === "map" && !!t.final;
+    const frameFor = (t) => {
+      if (!isClosing(t) || stripMode) return vp;
+      return vp.vw >= vp.vh ? besidePanel(vp, { right: Math.min(400, vp.vw * 0.36) + 24 }) : besidePanel(vp, { bottom: Math.min(320, vp.vh * 0.42) + 16 });
+    };
+    const camOf = (t) => camForTarget(frameFor(t), map, t);
     const posKey = `pathway:pos:${hash(payload.title)}`;
-    let live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
+    let live = new Timeline(camOf(nav.current()), nav.current());
     const restored = !capture && restorePosition();
     const deepLink = !capture && !restored && location.hash.length > 1 ? map.byId.get(decodeURIComponent(location.hash.slice(1))) : void 0;
     if (deepLink) {
       if (!nav.continueFrom({ kind: "stop", id: deepLink.id })) nav.visit(deepLink.id);
-      live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
+      live = new Timeline(camOf(nav.current()), nav.current());
     }
     function restorePosition() {
       try {
@@ -1405,7 +1434,7 @@
           const e = map.byId.get(id)?.edge;
           return e ? [{ id, len: e.len, rev: false }] : [];
         });
-        live = new Timeline(camForTarget(vp, map, nav.current()), nav.current(), walked);
+        live = new Timeline(camOf(nav.current()), nav.current(), walked);
         return true;
       } catch {
         return false;
@@ -1424,7 +1453,8 @@
       return true;
     }
     function fly(target, lightFrom) {
-      flyTo(live, now(), target, motion(), { lightFrom });
+      handoffOverride = null;
+      flyTo(live, now(), target, motion(), { lightFrom, cam: camOf(target) });
       hoverNode = null;
       dirty = true;
       updateHud();
@@ -1540,6 +1570,11 @@
       return { seg, settled, focus };
     }
     function updateHud() {
+      if (hud.handoff) {
+        const show = mode === "live" && (!stripMode || mapOpen) && (handoffOverride ?? isClosing(nav.current()));
+        hud.handoff.style.setProperty("--handoff-delay", handoffOverride !== null || reducedMotion ? "0s" : "1.4s");
+        docEl.classList.toggle("show-handoff", show);
+      }
       const target = mode === "tour" && tour ? tour.tl.segAt(tour.t)[0].target : nav.current();
       hud.crumbs.innerHTML = crumbsFor(map, target);
       if (mode !== "live" || stripMode) return;
@@ -1585,7 +1620,7 @@
       }
       requestAnimationFrame(frame);
     }
-    const strip = new Strip(byId("strip"), map, (n) => openMap(n), reducedMotion);
+    const strip = new Strip(byId("strip"), map, (n) => openMap(n), reducedMotion, payload.takeaways);
     function openMap(n) {
       mapOpen = true;
       docEl.classList.add("map-open");
@@ -1638,7 +1673,7 @@
         });
       } else {
         measure();
-        live = new Timeline(camForTarget(vp, map, nav.current()), nav.current(), live.walkedAt(now(), map));
+        live = new Timeline(camOf(nav.current()), nav.current(), live.walkedAt(now(), map));
         dirty = true;
         updateHud();
       }
@@ -1777,6 +1812,11 @@
       hud.buttons.motion.setAttribute("aria-pressed", String(profile === "remote"));
       dirty = true;
     }
+    function toggleHandoff() {
+      if (!hud.handoff || mode !== "live") return;
+      handoffOverride = !docEl.classList.contains("show-handoff");
+      updateHud();
+    }
     function toggleTheme() {
       const dark = docEl.dataset.theme ? docEl.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
       docEl.dataset.theme = dark ? "light" : "dark";
@@ -1828,6 +1868,8 @@
       f: toggleFullscreen,
       F: toggleFullscreen,
       "?": toggleHelp,
+      q: toggleHandoff,
+      Q: toggleHandoff,
       c: continueHere,
       C: continueHere
     };
@@ -1994,7 +2036,7 @@
       }
       measure();
       if (mode === "live") {
-        const tg = nav.current(), cam = camForTarget(vp, map, tg);
+        const tg = nav.current(), cam = camOf(tg);
         live.segs.push({ t0: now(), dur: 0, from: cam, to: cam, kind: "cut", target: tg, edges: [], total: 0 });
       } else if (tour) {
         tour = { ...buildTour(nav.route, motion()), playing: tour.playing, t: tour.t, origin: tour.origin };
@@ -2266,6 +2308,7 @@
       const notes = payload.notes;
       if (!notes) els.notes.innerHTML = `<p class="none">Speaker notes aren't in this build. Build with --with-notes, or use pathway present.</p>`;
       else if (t.kind === "stop") els.notes.innerHTML = notes[t.id] ?? '<p class="none">No notes for this stop.</p>';
+      else if (t.kind === "map" && t.final && payload.takeaways) els.notes.innerHTML = `<p class="where">The bottom line, beside the whole trail:</p>${payload.takeaways}`;
       else els.notes.innerHTML = `<p class="none">${t.kind === "map" ? "The whole map." : "A pull-back to show the branch you've walked."} No notes here.</p>`;
       const x = nav.excursion;
       const upcoming = x && x.i + 1 < x.stops.length ? x.stops[x.i + 1] : state.ahead;

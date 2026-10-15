@@ -3,7 +3,7 @@
 // the engine can follow.
 
 import type { Token } from "markdown-it";
-import { createMarkdown, figureParts, splitNotes } from "./markdown.ts";
+import { createMarkdown, figureParts, splitAsides } from "./markdown.ts";
 
 export interface RenderEnv {
   /** Stop titles by id, for [[links]] without a label. */
@@ -42,10 +42,10 @@ rules.fence = (tokens, i) => {
 };
 rules.code_block = (tokens, i) => `<pre><code>${escapeHtml(tokens[i].content.replace(/\n$/, ""))}</code></pre>\n`;
 
-/** Renders Markdown as card HTML, leaving out figures and speaker notes. */
+/** Renders Markdown as card HTML, leaving out figures, speaker notes and takeaways. */
 export function renderBody(source: string, { titles }: RenderEnv): string {
   const env: Record<string, unknown> = { titles };
-  const tokens = splitNotes(md.parse(source, env)).shown;
+  const tokens = splitAsides(md.parse(source, env)).shown;
   const kept: Token[] = [];
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];

@@ -32,7 +32,8 @@ node src/cli.ts new-skin ../skins/brand.css           # start your own skin: col
   the presenter window: notes, timer, what's next, the detours within reach.
 - `build` writes `<deck>-build/`. Its `index.html` opens from disk, offline, and
   can't reach the network. Speaker notes are left out unless you pass
-  `--with-notes`.
+  `--with-notes`. `--url <address>` says where the audience copy will live; the
+  talk ends on a QR code for it, beside the deck's bottom line.
 
 ## Development
 

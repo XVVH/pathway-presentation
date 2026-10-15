@@ -112,6 +112,7 @@ export function startPresenter(payload: Payload, token: string): void {
     const notes = payload.notes;
     if (!notes) els.notes.innerHTML = '<p class="none">Speaker notes aren\'t in this build. Build with --with-notes, or use pathway present.</p>';
     else if (t.kind === "stop") els.notes.innerHTML = notes[t.id] ?? '<p class="none">No notes for this stop.</p>';
+    else if (t.kind === "map" && t.final && payload.takeaways) els.notes.innerHTML = `<p class="where">The bottom line, beside the whole trail:</p>${payload.takeaways}`;
     else els.notes.innerHTML = `<p class="none">${t.kind === "map" ? "The whole map." : "A pull-back to show the branch you've walked."} No notes here.</p>`;
 
     const x = nav.excursion;

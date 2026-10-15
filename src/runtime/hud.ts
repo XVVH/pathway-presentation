@@ -17,6 +17,7 @@ export const KEYS: [string, string][] = [
   ["V", "Play the route by itself, with a scrubber."],
   ["R", "Remote mode: quicker, flatter moves for screen share."],
   ["B", "Blank the screen. Any key brings it back."],
+  ["Q", "The bottom line, and the code to take this talk home on a phone."],
   ["D", "Dark or light."],
   ["F", "Full screen."],
   ["Drag, wheel, pinch", "Explore freely. Click any stop to look at it; → comes back."],
@@ -32,10 +33,24 @@ export interface Hud {
   scrubTime: HTMLElement;
   play: HTMLButtonElement;
   dev: HTMLElement;
+  handoff: HTMLElement | null;
   buttons: Record<"tour" | "motion" | "presenter" | "help" | "prev" | "next" | "map" | "back", HTMLButtonElement>;
 }
 
-export function buildHud(title: string): string {
+/** A web address as people read it: no scheme, no trailing slash. */
+export function shortUrl(url: string): string {
+  try { const u = new URL(url); return `${u.host}${u.pathname.replace(/\/$/, "")}${u.search}`; } catch { return url; }
+}
+
+/** The closing panel: the deck's bottom line, and the code to take the talk home. */
+export function handoffHtml(takeaways: string | null, handoff: { url: string; qr: string } | null): string {
+  if (!takeaways && !handoff) return "";
+  const bottom = takeaways ? `<section class="bottom-line"><h3>The bottom line</h3><div class="md">${takeaways}</div></section>` : "";
+  const code = handoff ? `<section class="take-home"><div class="qr">${handoff.qr}</div><p class="url">${esc(shortUrl(handoff.url))}</p><p class="hint">Scan to explore this talk on your phone.</p></section>` : "";
+  return `<aside id="handoff" class="pill" aria-label="The bottom line, and this talk to take home">${bottom}${code}</aside>`;
+}
+
+export function buildHud(title: string, closing = ""): string {
   return `
 <main id="stage" tabindex="0" aria-label="${esc(title)}: a map of the talk. Use the arrow keys to travel.">
   <canvas id="ground"></canvas>
@@ -76,6 +91,7 @@ export function buildHud(title: string): string {
     </div>
   </div>
   <div id="dev" class="pill" hidden></div>
+  ${closing}
 </main>
 <div id="strip" aria-label="The route as a scrolling strip"></div>`;
 }
@@ -84,7 +100,7 @@ export function hudRefs(): Hud {
   return {
     crumbs: byId("crumbs"), status: byId("status"), minimap: byId<HTMLCanvasElement>("minimap"), help: byId("help"),
     start: byId<HTMLButtonElement>("btn-start"), scrub: byId<HTMLInputElement>("scrub-range"), scrubTime: byId("scrub-time"),
-    play: byId<HTMLButtonElement>("btn-play"), dev: byId("dev"),
+    play: byId<HTMLButtonElement>("btn-play"), dev: byId("dev"), handoff: document.getElementById("handoff"),
     buttons: {
       tour: byId<HTMLButtonElement>("btn-tour"), motion: byId<HTMLButtonElement>("btn-motion"), presenter: byId<HTMLButtonElement>("btn-presenter"),
       help: byId<HTMLButtonElement>("btn-help"), prev: byId<HTMLButtonElement>("btn-prev"), next: byId<HTMLButtonElement>("btn-next"),

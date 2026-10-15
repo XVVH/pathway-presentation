@@ -18,12 +18,14 @@ export class Strip {
   private raf = 0;
   private onOpenMap: (n: MapNode | null) => void;
   private reducedMotion: boolean;
+  private bottomLine: string | null;
 
-  constructor(el: HTMLElement, map: WorldMap, onOpenMap: (n: MapNode | null) => void, reducedMotion: boolean) {
+  constructor(el: HTMLElement, map: WorldMap, onOpenMap: (n: MapNode | null) => void, reducedMotion: boolean, bottomLine: string | null) {
     this.el = el;
     this.map = map;
     this.onOpenMap = onOpenMap;
     this.reducedMotion = reducedMotion;
+    this.bottomLine = bottomLine;
   }
 
   build(): void {
@@ -45,7 +47,7 @@ export class Strip {
     this.el.innerHTML = `
       <div class="s-bar"><div class="s-crumb" id="s-crumb"></div><button type="button" id="s-map">Map</button></div>
       <div class="s-col">
-        <header class="s-hero"><div class="eyebrow"><span class="num">${stations} stops</span><span>Scroll to walk the route</span></div><h1>${esc(map.root.stop.title)}</h1><div class="md">${map.root.stop.body}</div></header>
+        <header class="s-hero"><div class="eyebrow"><span class="num">${stations} stops</span><span>Scroll to walk the route</span></div><h1>${esc(map.root.stop.title)}</h1><div class="md">${map.root.stop.body}</div>${this.bottomLine ? `<section class="s-bottom-line"><h2>The bottom line</h2><div class="md">${this.bottomLine}</div></section>` : ""}</header>
         <div class="s-trail" id="s-trail"><svg class="s-rail" id="s-rail" aria-hidden="true"></svg>${parts.join("")}</div>
         <footer class="s-end"><p>End of the route</p><button type="button" id="s-whole">See the whole map</button></footer>
       </div>`;

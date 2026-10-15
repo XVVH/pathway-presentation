@@ -28,6 +28,11 @@ export function viewport(vw: number, vh: number, insets: Insets = HUD_INSETS): V
   return { vw, vh, frame, cw };
 }
 
+/** The same screen with a panel over one side: the frame shrinks, reading size doesn't. */
+export function besidePanel(v: Viewport, panel: { right?: number; bottom?: number }): Viewport {
+  return { ...v, frame: { ...v.frame, w: Math.max(120, v.frame.w - (panel.right ?? 0)), h: Math.max(120, v.frame.h - (panel.bottom ?? 0)) } };
+}
+
 /** The camera that puts world point (cx, cy) in the middle of the frame at scale k. */
 export function camFor(v: Viewport, cx: number, cy: number, k: number): Cam {
   const fx = v.frame.x + v.frame.w / 2, fy = v.frame.y + v.frame.h / 2;

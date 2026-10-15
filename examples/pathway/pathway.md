@@ -10,6 +10,12 @@ routes:
 # Pathway
 A talk you travel through instead of paging through.
 
+::: takeaways
+- A deck is a map; the talk is one route through it.
+- Write it as plain Markdown. Pathway lays out the map.
+- Detours answer questions without losing your place.
+:::
+
 ::: notes
 Open on the whole map and let it sit for a beat. Say: "This is everything we'll cover today. We'll walk it, then come back up here at the end."
 :::

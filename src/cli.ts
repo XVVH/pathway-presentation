@@ -7,6 +7,7 @@ import { buildDeck, displayPath } from "./build.ts";
 import { checkDeck, type CheckResult } from "./check.ts";
 import { applyEdits, safeEdits } from "./fix.ts";
 import { formatDeck } from "./fmt.ts";
+import { checkUrl } from "./frontmatter.ts";
 import { planInlineNotes } from "./inline-notes.ts";
 import { checkJson, formatCheck, formatOutline, outlineJson } from "./format.ts";
 import { nodeIo } from "./io-node.ts";
@@ -27,7 +28,7 @@ Commands
   build <deck.md>     Make a folder to present from anywhere, offline: open its
                       index.html in a browser. Notes stay out unless asked for.
   fmt <file.md>...    Tidy a deck's layout without changing what it says.
-  new-skin <file.css>  Start your own skin: colours, fonts and motion, from a
+  new-skin <file.css> Start your own skin: colours, fonts and motion, from a
                       built-in skin (--from, default boardroom).
   inline-notes <deck.md>
                       Move a separate notes file into the deck, as ::: notes
@@ -47,6 +48,8 @@ Options
   --with-notes        build: include speaker notes for the presenter window.
                       Anyone with the folder can read them.
   --force             build: build even when the deck has errors.
+  --url <address>     build: where the audience copy will live. The closing
+                      view shows it as a QR code. Overrides the deck's url.
   --port <n>          present: the port (default 4310; 0 picks a free one).
   --write             fmt: rewrite the files in place. inline-notes: move the notes.
   --check             fmt: exit 1 if any file would change.
@@ -71,7 +74,7 @@ async function main(argv: string[]): Promise<number> {
       options: {
         json: { type: "boolean" }, strict: { type: "boolean" }, fix: { type: "boolean" },
         notes: { type: "string" }, "no-notes": { type: "boolean" },
-        out: { type: "string" }, "with-notes": { type: "boolean" }, force: { type: "boolean" },
+        out: { type: "string" }, "with-notes": { type: "boolean" }, force: { type: "boolean" }, url: { type: "string" },
         port: { type: "string" }, write: { type: "boolean" }, check: { type: "boolean" },
         stop: { type: "string", multiple: true }, map: { type: "boolean" }, all: { type: "boolean" },
         size: { type: "string" }, scale: { type: "string" }, theme: { type: "string" }, from: { type: "string" },
@@ -134,9 +137,11 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case "build": {
+      const url = o.url === undefined ? undefined : checkUrl(o.url);
+      if (url === null) return usage("--url must be a full web address, like https://intranet.example.com/talks/pipelines/.");
       let result;
       try {
-        result = buildDeck(deckPath, { out: o.out, withNotes: o["with-notes"], notes: o.notes, force: o.force });
+        result = buildDeck(deckPath, { out: o.out, withNotes: o["with-notes"], notes: o.notes, force: o.force, url });
       } catch (e) {
         process.stderr.write(`${(e as Error).message}\n`);
         return 1;
@@ -148,6 +153,7 @@ async function main(argv: string[]): Promise<number> {
       if (result.check.summary.warnings || result.check.summary.errors) process.stderr.write(`${formatCheck(result.check, { color })}\n\n`);
       const media = result.files.filter(f => f !== "index.html" && !f.startsWith("fonts/")).length;
       process.stdout.write(`Built ${displayPath(result.out)}/index.html (${plural(media, "media file")}). Open it in a browser to present.\n`);
+      if (result.url) process.stdout.write(`The closing view's QR code points to ${result.url}. Put this folder there for the audience.\n`);
       if (result.skinFonts.length) process.stderr.write(`This build includes your skin's fonts (${result.skinFonts.join(", ")}). Check their licence before sharing it outside your organisation.\n`);
       if (result.notes === 0) process.stderr.write("There were no speaker notes to include: none in the deck, and no notes file.\n");
       else if (result.notes) process.stderr.write(`Speaker notes for ${plural(result.notes, "stop")} are included: anyone with this folder can read them.\n`);

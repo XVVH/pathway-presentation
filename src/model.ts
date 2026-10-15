@@ -104,11 +104,14 @@ export interface Stop {
   /** Words of body text: paragraphs, list items, quotes and tables. */
   words: number;
   /** Speaker notes written in the stop, as `::: notes` blocks. Never shown on the card. */
-  notes: InlineNotes[];
+  notes: Aside[];
+  /** The deck's bottom line, as `::: takeaways` blocks. Only the title stop's count. */
+  takeaways: Aside[];
 }
 
-export interface InlineNotes {
-  /** The `::: notes` line. */
+/** A `::: notes` or `::: takeaways` block. */
+export interface Aside {
+  /** The opening `:::` line. */
   line: number;
   /** The closing `:::` line, or the last line of notes when it's missing. */
   endLine: number;
@@ -130,6 +133,8 @@ export interface DeckMeta {
   density: Density;
   routes: NamedRoute[];
   notes?: string;
+  /** Where the audience copy lives; the closing view shows it as a QR code. */
+  url?: string;
   raw: Record<string, unknown>;
 }
 

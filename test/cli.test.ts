@@ -68,7 +68,7 @@ test("outline: the tree, the route, and the same as JSON", () => {
   const json = JSON.parse(run("outline", "examples/pathway/pathway.md", "--json").out);
   assert.equal(json.stops.length, 19);
   assert.deepEqual(json.stops[1], {
-    id: "corridors", title: "Decks are corridors", line: 17, level: 2, depth: 1, parent: "pathway",
+    id: "corridors", title: "Decks are corridors", line: 23, level: 2, depth: 1, parent: "pathway",
     children: ["prezi", "impress", "powerpoint"], detour: false, density: null, words: 35, bullets: 3,
     media: [], links: [], hasNotes: true, card: json.stops[1].card,
   });

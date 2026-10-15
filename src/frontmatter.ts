@@ -6,7 +6,7 @@ import type { DeckMeta, Diagnostic, NamedRoute } from "./model.ts";
 import { closest } from "./text.ts";
 import { DENSITIES, DEFAULT_SKIN, SKINS, type Density } from "./typography.ts";
 
-const KNOWN_KEYS = ["title", "subtitle", "author", "date", "description", "skin", "density", "routes", "notes"];
+const KNOWN_KEYS = ["title", "subtitle", "author", "date", "description", "skin", "density", "routes", "notes", "url"];
 
 export interface Frontmatter {
   /** Number of lines the frontmatter occupies, including both --- lines. 0 if none. */
@@ -66,6 +66,11 @@ export function readFrontmatter(lines: readonly string[], file: string, diagnost
     if (typeof data.notes === "string" && data.notes.trim()) meta.notes = data.notes.trim();
     else diagnostics.push({ code: "frontmatter-type", severity: "error", file, line: keyLine("notes"), message: "`notes` should be the path of the speaker notes file." });
   }
+  if (data.url !== undefined) {
+    const url = typeof data.url === "string" ? checkUrl(data.url) : null;
+    if (url) meta.url = url;
+    else diagnostics.push({ code: "url-invalid", severity: "error", file, line: keyLine("url"), message: "`url` is where the audience copy of the deck lives, as a full web address (https://...). The closing view shows it as a QR code." });
+  }
   if (data.routes !== undefined) meta.routes = readRoutes(doc.get("routes", true), lineOf, keyLine("routes"), file, diagnostics);
   return { lineCount: close + 1, meta };
 }
@@ -87,4 +92,14 @@ function readRoutes(node: unknown, lineOf: (o: number) => number, line: number, 
     routes.push({ name, line: nameLine, stops });
   }
   return routes;
+}
+
+/** A web address a phone can open, normalised to plain ASCII; null if it isn't one. */
+export function checkUrl(value: string): string | null {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : null;
+  } catch {
+    return null;
+  }
 }

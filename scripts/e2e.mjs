@@ -20,7 +20,7 @@ const shots = args.includes("--shots") ? args[args.indexOf("--shots") + 1] : nul
 if (shots) mkdirSync(shots, { recursive: true });
 
 const tmp = mkdtempSync(join(tmpdir(), "pathway-e2e-"));
-const built = buildDeck("examples/pathway/pathway.md", { out: join(tmp, "deck"), withNotes: true });
+const built = buildDeck("examples/pathway/pathway.md", { out: join(tmp, "deck"), withNotes: true, url: "https://slides.example.com/pathway/" });
 const url = pathToFileURL(join(built.out, "index.html")).href;
 
 const problems = [];
@@ -167,6 +167,29 @@ await step("the whole map", async () => {
   await shot(deck, "07-map");
 });
 
+await step("the talk ends on the whole trail, with the bottom line and the take-home code", async () => {
+  const shown = () => deck.evaluate(() => getComputedStyle(document.getElementById("handoff")).visibility === "visible");
+  expect(!(await shown()), "panel shown before the end");
+  await deck.keyboard.press("End");
+  await settle(deck);
+  expect(await shown(), "no closing panel at the end");
+  const text = await deck.locator("#handoff").innerText();
+  expect(/THE BOTTOM LINE/i.test(text) && /slides\.example\.com\/pathway/.test(text), `panel text: ${text}`);
+  expect(await deck.locator("#handoff svg path").count() === 1, "no QR code");
+  await shot(deck, "07a-closing");
+  await deck.keyboard.press("q");
+  await deck.waitForTimeout(700);
+  expect(!(await shown()), "Q didn't hide it");
+  await deck.keyboard.press("Home");
+  await settle(deck);
+  await deck.keyboard.press("q");
+  await deck.waitForTimeout(300);
+  expect(await shown(), "Q didn't show it mid-talk");
+  await deck.keyboard.press("ArrowRight");
+  await deck.waitForTimeout(700);
+  expect(!(await shown()), "moving on didn't put it away");
+});
+
 await step("dark theme", async () => {
   await deck.keyboard.press("d");
   await deck.waitForTimeout(400);
@@ -182,6 +205,7 @@ await step("a phone gets the strip map, with the landscape a tap away", async ()
   await phone.goto(url);
   await phone.evaluate(() => document.fonts.ready);
   expect(await phone.locator("#strip").isVisible(), "strip not shown");
+  expect(/A deck is a map/.test(await phone.locator(".s-bottom-line").innerText()), "no bottom line at the top");
   await phone.locator("#strip").evaluate(el => el.scrollTo(0, 900));
   await phone.waitForTimeout(400);
   await shot(phone, "09-strip");

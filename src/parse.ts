@@ -5,7 +5,7 @@
 import type { Token } from "markdown-it";
 import { parseAttrs, splitTrailingAttrs } from "./attrs.ts";
 import { readFrontmatter } from "./frontmatter.ts";
-import { createMarkdown, figureParts, runsOf, runsText, splitNotes } from "./markdown.ts";
+import { createMarkdown, figureParts, runsOf, runsText, splitAsides } from "./markdown.ts";
 import { mediaKind, isRemote } from "./media.ts";
 import type { Block, Deck, Diagnostic, ListItem, MediaRef, Stop, WikiLink } from "./model.ts";
 import { closest, countWords, slugify } from "./text.ts";
@@ -71,14 +71,16 @@ export function parseDeck(source: string, file: string): Deck {
   const trim = (start: number, end: number) => { while (end > start && !lines[end - 1]?.trim()) end--; return end; };
   for (const s of stops) for (const b of s.blocks) b.endLine = trim(b.line, b.endLine);
   for (const s of stops) {
-    for (const n of s.notes) {
-      if (n.closed) continue;
-      n.endLine = trim(n.line, n.endLine);
-      diag({
-        code: "notes-unclosed", severity: "warning", line: n.line, stop: s.id,
-        message: "These notes have no closing ':::', so they run to the next heading. Close them with ':::' on its own line.",
-        fix: { description: "Close the notes after their last line.", safe: true, edits: [{ file, startLine: n.endLine + 1, endLine: n.endLine + 1, newText: ":::" }] },
-      });
+    for (const kind of ["notes", "takeaways"] as const) {
+      for (const n of s[kind]) {
+        if (n.closed) continue;
+        n.endLine = trim(n.line, n.endLine);
+        diag({
+          code: `${kind}-unclosed`, severity: "warning", line: n.line, stop: s.id,
+          message: `These ${kind} have no closing ':::', so they run to the next heading. Close them with ':::' on its own line.`,
+          fix: { description: `Close the ${kind} after their last line.`, safe: true, edits: [{ file, startLine: n.endLine + 1, endLine: n.endLine + 1, newText: ":::" }] },
+        });
+      }
     }
   }
   // A stop's body runs until the next heading.
@@ -105,6 +107,13 @@ export function parseDeck(source: string, file: string): Deck {
     byId.set(s.id, s);
   }
   const root = buildTree(stops, lines, file, diag);
+  // The bottom line is the whole deck's, so it sits under the title.
+  for (const s of stops) {
+    if (s === root) continue;
+    for (const t of s.takeaways) {
+      diag({ code: "takeaways-misplaced", severity: "warning", line: t.line, stop: s.id, message: "Takeaways are the whole deck's bottom line, so they go under the # title. Here they aren't shown. Move them up." });
+    }
+  }
   return { file, lines, meta: { ...fm.meta, title: fm.meta.title ?? root?.title }, stops, byId, root, diagnostics };
 }
 
@@ -143,7 +152,7 @@ function startStop(open: Token, inline: Token, file: string, diag: (d: Omit<Diag
   return {
     id, idExplicit: !!attrs.id, title, level, depth: 0, line, endLine: line,
     classes: attrs.classes, attrs: attrs.kv, detour: attrs.classes.includes("detour"), density,
-    parent: null, children: [], blocks: [], links: [], media: [], words: 0, notes: [],
+    parent: null, children: [], blocks: [], links: [], media: [], words: 0, notes: [], takeaways: [],
   };
 }
 
@@ -154,12 +163,12 @@ function addBlock(stop: Stop, all: Token[], file: string, diag: (d: Omit<Diagnos
     if (inl.children?.some(c => c.type === "html_inline")) diag({ code: "raw-html", severity: "warning", line: lineOf(inl), stop: stop.id, message: "Raw HTML isn't rendered. Use Markdown, so the stop works on the map, in the strip and in video." });
   }
 
-  // Speaker notes belong to the stop but never to its card.
-  const { shown: slice, notes } = splitNotes(all);
-  for (const n of notes) {
-    const open = n[0], closed = !!(open.meta as { closed?: boolean } | null)?.closed;
-    const words = n.filter(t => t.type === "inline").reduce((a, t) => a + countWords(runsText(runsOf(t.children))), 0);
-    stop.notes.push({ line: lineOf(open), endLine: endLineOf(open), closed, words });
+  // Notes and takeaways belong to the stop but never to its card.
+  const { shown: slice, asides } = splitAsides(all);
+  for (const a of asides) {
+    const open = a.tokens[0], closed = !!(open.meta as { closed?: boolean } | null)?.closed;
+    const words = a.tokens.filter(t => t.type === "inline").reduce((n, t) => n + countWords(runsText(runsOf(t.children))), 0);
+    stop[a.kind].push({ line: lineOf(open), endLine: endLineOf(open), closed, words });
   }
   if (!slice.length) return;
   const first = slice[0];

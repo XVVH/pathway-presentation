@@ -33,8 +33,9 @@ installed, say so rather than installing it unasked.
   offline. It refuses a deck with errors (`--force` overrides). Speaker notes stay
   out unless you pass `--with-notes`; don't add that flag unless the person asked,
   since anyone with the folder can read them.
-- Keys: → next, ← back, ↓ detour, ↑ pull back, M map, P presenter, V tour, R remote
-  (for screen share), B blank, D dark or light, F full screen, ? help.
+- Keys: → next, ← back, ↓ detour, ↑ pull back, M map, P presenter, Q bottom line and
+  QR code, V tour, R remote (for screen share), B blank, D dark or light, F full
+  screen, ? help.
 - Clicking a stop looks at it without losing your place: → rejoins the route where
   you left. C carries on the talk from the stop you're looking at instead.
 
@@ -55,10 +56,16 @@ skin: sectional          # or boardroom, or the path of your own skin's .css
 density: talk            # or technical
 routes:
   exec: [intake, fix]    # named routes are lists of stop ids
+url: https://intranet.example.com/talks/pipelines/   # where the audience copy lives
 ---
 
 # Why pipelines stall
 Every team hits the same three walls.
+
+::: takeaways
+- Limit work in progress.
+- Make the queue visible.
+:::
 
 ## Intake {#intake}
 Requests arrive faster than anyone triages them.
@@ -150,6 +157,18 @@ only, not titles or captions.
 - On screen: the claim and the evidence. In the notes: the story you tell around
   it.
 
+## The bottom line and the handoff
+
+- **Takeaways** are the whole deck's bottom line: one `::: takeaways` block under the
+  `#` title, usually a short list. They're never on a card. Phones open with them, and
+  the talk ends on them, beside the whole trail. Anywhere else they're flagged
+  (`takeaways-misplaced`) and not shown.
+- **`url`** in the frontmatter (or `pathway build --url`, which wins) is where the
+  audience copy of the deck will live. The closing view shows it as a QR code, drawn
+  at build time. It must be a full `https://` (or `http://`) address
+  (`url-invalid`). Without one, the closing view shows the takeaways alone.
+- Q shows or hides the panel at any point in the talk.
+
 ## Speaker notes
 
 Write a stop's notes inside it, between `::: notes` and `:::` on lines of their
@@ -212,7 +231,7 @@ file into the deck.
 - **Structure:** `no-title`, `multiple-titles`, `heading-skip`, `empty-title`,
   `no-id`, `duplicate-id`, `root-detour`, `bad-attribute`, `unknown-density`
 - **Frontmatter:** `frontmatter-unclosed`, `frontmatter-yaml`, `frontmatter-type`,
-  `route-format`, `route-empty`, `route-unknown-stop`
+  `route-format`, `route-empty`, `route-unknown-stop`, `url-invalid`
 - **References:** `broken-link`, `missing-media`, `notes-file-missing`,
   `skin-not-found`, `skin-font-missing`
 - **Density:** `stop-overflow`
@@ -231,3 +250,4 @@ file into the deck.
   `skin-bend-unknown` (and `skin-font-variable`, for information)
 - **Notes:** `notes-unclosed`, `notes-orphan`, `notes-ambiguous`, `notes-duplicate`,
   `notes-preamble`
+- **Takeaways:** `takeaways-unclosed`, `takeaways-misplaced`

@@ -7,6 +7,7 @@ import { joinPosix, type Io } from "./io.ts";
 import { imageSize } from "./media.ts";
 import type { Deck, MediaRef, Stop } from "./model.ts";
 import type { Payload, PayloadFigure, PayloadRoute, PayloadStop, Target } from "./payload.ts";
+import { qrSvg } from "./qr.ts";
 import { defaultRoute } from "./routes.ts";
 import { CARD } from "./typography.ts";
 
@@ -15,6 +16,8 @@ export interface CompileOptions {
   notes?: boolean;
   /** Served by `pathway present`. */
   dev?: boolean;
+  /** Where the audience copy will live, overriding the deck's `url`. */
+  url?: string;
 }
 
 export interface Compiled {
@@ -92,10 +95,17 @@ export function compileDeck(result: CheckResult, io: Io, opts: CompileOptions = 
     }
   }
 
+  // The bottom line: the title stop's takeaways.
+  const bottomLine = root.takeaways.map(t => renderBody(bodyLines(deck.lines, t.line, t.closed ? t.endLine - 1 : t.endLine), { titles })).filter(Boolean).join("\n");
+  const url = opts.url ?? deck.meta.url;
+
   return {
     payload: {
       version: 1, title: deck.meta.title ?? root.title, skin: result.skin.file ? `custom (${result.skin.base})` : result.skin.base, bend: result.skin.bend,
-      stops, route, routes, notes, dev: !!opts.dev,
+      stops, route, routes, notes,
+      takeaways: bottomLine || null,
+      handoff: url ? { url, qr: qrSvg(url) } : null,
+      dev: !!opts.dev,
     },
     media: [...media].sort(),
   };

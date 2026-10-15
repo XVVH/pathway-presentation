@@ -212,8 +212,24 @@ in the same way.
   strip.
 
 Strip mode applies whenever the screen is under 760px wide or 500px tall, so phones
-in landscape get it too. Each trunk stop can carry a one-line takeaway, so the concise
-notes you hand out today can lead the strip.
+in landscape get it too.
+
+**The bottom line.** A deck has one set of takeaways, not one per stop: stops are
+tight enough already. They're written once, under the title, as `::: takeaways`, and
+are never on a card. The phone view opens with them, bottom line up front, and the
+talk ends on them: the closing view frames the whole trail beside a panel with the
+bottom line and the take-home code. The presenter window shows them as the notes
+for that moment. Q brings the panel up at any point, for people who want to follow
+along on their phones.
+
+**Pathway builds; something else hosts.** The deck says where its audience copy
+will live (`url:`, or `build --url`, which wins). The build draws the QR code for that
+address into the page, so the page still never touches the network. Work talks go to
+an intranet page; a publishing service can run `pathway build --url <address>` and
+upload the folder, which is plain static files. The same address goes in the copy you
+present from (with notes) and the copy you hand off (without), so the code on screen
+is the code people scan. The QR library (`qrcode-generator`, MIT, no dependencies) runs
+at build time only; tests read every code back with a decoder.
 
 ### 9. Offline and private by default
 
@@ -469,7 +485,7 @@ From the first review:
 1. Should vertical video renders run the trunk south (see 10a)?
 2. ~~Route syntax~~: a list of stop ids in the frontmatter. It's enough for a short
    cut of a long talk; revisit if routes need pauses or custom pull-backs.
-3. Takeaway syntax: a `> takeaway:` line, or the first sentence of each trunk stop?
+3. ~~Takeaway syntax~~: one `::: takeaways` block under the title; see 8.
 4. Follow link: is a relay acceptable for work talks, or personal/consultancy only?
 5. Can Node run on the work machine, or does the browser-hosted compiler come first?
    A built deck needs only a browser, so building elsewhere and copying the folder
@@ -489,7 +505,9 @@ From the first review:
    `pathway present` (local, live reload, notes), `pathway build` (an offline folder
    behind a strict content security policy), the presenter window (13), named routes,
    `fmt`, and `render`. Checked in a real browser by `npm run e2e`.
-3. Explore and handoff: the phone layout, QR on the final view, takeaways.
+3. Explore and handoff: ~~the bottom line, QR on the closing view, `--url`~~. Still to
+   do: tuning the phone layout with real content, and explore mode for the audience
+   copy (no presenter controls, the map first).
 4. Media pipeline: transcode, posters, variants, hashing, route-aware prefetch.
 5. Video export: narration from notes, timing from the route. Playwright's bundled
    Chromium can't decode H.264, so capture needs WebM clips, or Chrome itself.

@@ -4,10 +4,10 @@
 
 import type { Payload, Target } from "../payload.ts";
 import { Cards } from "./cards.ts";
-import { camForTarget, clampWidth, fitNode, HUD_INSETS, viewport, type Viewport } from "./camera.ts";
+import { besidePanel, camForTarget, clampWidth, fitNode, HUD_INSETS, viewport, type Viewport } from "./camera.ts";
 import { byId, esc, fmtTime, readTokens, store, type Tokens } from "./dom.ts";
 import { Ground, Minimap } from "./ground.ts";
-import { buildHud, crumbsFor, hudRefs, positionLine, type Hud } from "./hud.ts";
+import { buildHud, crumbsFor, handoffHtml, hudRefs, positionLine, type Hud } from "./hud.ts";
 import { createMap, layoutMap, targetNode, type MapNode, type TrailStep, type WorldMap } from "./map.ts";
 import { hash, type Cam } from "./math.ts";
 import { Navigator } from "./navigator.ts";
@@ -53,7 +53,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   const wantRoute = params.get("route");
   if (wantRoute && routes.has(wantRoute)) nav.useRoute(wantRoute);
 
-  document.body.insertAdjacentHTML("afterbegin", buildHud(payload.title));
+  document.body.insertAdjacentHTML("afterbegin", buildHud(payload.title, handoffHtml(payload.takeaways, payload.handoff)));
   document.body.insertAdjacentHTML("beforeend", '<div id="blank" aria-hidden="true"></div>');
   const hud: Hud = hudRefs();
   const stage = byId("stage"), worldEl = byId("world");
@@ -80,15 +80,26 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   }
   measure();
 
+  // The talk ends on the whole trail, with the bottom line and the take-home code
+  // beside it; the map is framed in the space the panel leaves.
+  /** Null: shown on the closing view only. Otherwise Q has shown or hidden it until the next move. */
+  let handoffOverride: boolean | null = null;
+  const isClosing = (t: Target) => !!hud.handoff && t.kind === "map" && !!t.final;
+  const frameFor = (t: Target): Viewport => {
+    if (!isClosing(t) || stripMode) return vp;
+    return vp.vw >= vp.vh ? besidePanel(vp, { right: Math.min(400, vp.vw * 0.36) + 24 }) : besidePanel(vp, { bottom: Math.min(320, vp.vh * 0.42) + 16 });
+  };
+  const camOf = (t: Target) => camForTarget(frameFor(t), map, t);
+
   // ------------------------------------------------------------ where we start
   const posKey = `pathway:pos:${hash(payload.title)}`;
-  let live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
+  let live = new Timeline(camOf(nav.current()), nav.current());
   const restored = !capture && restorePosition();
   const deepLink = !capture && !restored && location.hash.length > 1 ? map.byId.get(decodeURIComponent(location.hash.slice(1))) : undefined;
   if (deepLink) {
     // A link to a stop starts the talk there when the route passes it.
     if (!nav.continueFrom({ kind: "stop", id: deepLink.id })) nav.visit(deepLink.id);
-    live = new Timeline(camForTarget(vp, map, nav.current()), nav.current());
+    live = new Timeline(camOf(nav.current()), nav.current());
   }
 
   function restorePosition(): boolean {
@@ -101,7 +112,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       nav.offRoute = saved.offRoute;
       nav.here = saved.here;
       const walked: TrailStep[] = saved.walked.flatMap(id => { const e = map.byId.get(id)?.edge; return e ? [{ id, len: e.len, rev: false }] : []; });
-      live = new Timeline(camForTarget(vp, map, nav.current()), nav.current(), walked);
+      live = new Timeline(camOf(nav.current()), nav.current(), walked);
       return true;
     } catch { return false; }
   }
@@ -125,7 +136,8 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     return true;
   }
   function fly(target: Target, lightFrom: Target | null | undefined): void {
-    flyTo(live, now(), target, motion(), { lightFrom });
+    handoffOverride = null;
+    flyTo(live, now(), target, motion(), { lightFrom, cam: camOf(target) });
     hoverNode = null;
     dirty = true;
     updateHud();
@@ -222,6 +234,12 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   }
 
   function updateHud(): void {
+    if (hud.handoff) {
+      const show = mode === "live" && (!stripMode || mapOpen) && (handoffOverride ?? isClosing(nav.current()));
+      // Arriving at the end, the panel waits for the camera; asked for with Q, it comes at once.
+      hud.handoff.style.setProperty("--handoff-delay", handoffOverride !== null || reducedMotion ? "0s" : "1.4s");
+      docEl.classList.toggle("show-handoff", show);
+    }
     const target = mode === "tour" && tour ? tour.tl.segAt(tour.t)[0].target : nav.current();
     hud.crumbs.innerHTML = crumbsFor(map, target);
     if (mode !== "live" || stripMode) return;
@@ -259,7 +277,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   }
 
   // ------------------------------------------------------------ strip map (small screens)
-  const strip = new Strip(byId("strip"), map, n => openMap(n), reducedMotion);
+  const strip = new Strip(byId("strip"), map, n => openMap(n), reducedMotion, payload.takeaways);
   function openMap(n: MapNode | null): void {
     mapOpen = true;
     docEl.classList.add("map-open");
@@ -310,7 +328,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       requestAnimationFrame(() => { strip.drawRails(); strip.onScroll(); });
     } else {
       measure();
-      live = new Timeline(camForTarget(vp, map, nav.current()), nav.current(), live.walkedAt(now(), map));
+      live = new Timeline(camOf(nav.current()), nav.current(), live.walkedAt(now(), map));
       dirty = true;
       updateHud();
     }
@@ -399,6 +417,11 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     hud.buttons.motion.setAttribute("aria-pressed", String(profile === "remote"));
     dirty = true;
   }
+  function toggleHandoff(): void {
+    if (!hud.handoff || mode !== "live") return;
+    handoffOverride = !docEl.classList.contains("show-handoff");
+    updateHud();
+  }
   function toggleTheme(): void {
     const dark = docEl.dataset.theme ? docEl.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
     docEl.dataset.theme = dark ? "light" : "dark";
@@ -415,6 +438,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     h: () => { hoverOn = !hoverOn; hoverNode = null; dirty = true; }, H: () => { hoverOn = !hoverOn; hoverNode = null; dirty = true; },
     b: () => setBlank(!blank), B: () => setBlank(!blank), ".": () => setBlank(!blank),
     d: toggleTheme, D: toggleTheme, f: toggleFullscreen, F: toggleFullscreen, "?": toggleHelp,
+    q: toggleHandoff, Q: toggleHandoff,
     c: continueHere, C: continueHere,
   };
   window.addEventListener("keydown", e => {
@@ -542,7 +566,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     if (stripMode) { strip.drawRails(); strip.onScroll(); if (!mapOpen) return; }
     measure();
     if (mode === "live") {
-      const tg = nav.current(), cam = camForTarget(vp, map, tg);
+      const tg = nav.current(), cam = camOf(tg);
       live.segs.push({ t0: now(), dur: 0, from: cam, to: cam, kind: "cut", target: tg, edges: [], total: 0 });
     } else if (tour) {
       tour = { ...buildTour(nav.route, motion()), playing: tour.playing, t: tour.t, origin: tour.origin };

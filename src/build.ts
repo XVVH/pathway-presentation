@@ -19,6 +19,8 @@ export interface BuildOptions {
   notes?: string;
   /** Build even when the deck has errors. */
   force?: boolean;
+  /** Where the audience copy will live, for the closing view's QR code. Overrides the deck's `url`. */
+  url?: string;
 }
 
 export interface BuildResult {
@@ -30,6 +32,8 @@ export interface BuildResult {
   notes: number | null;
   /** Your skin's own font files, which may not be licensed for sharing outside your organisation. */
   skinFonts: string[];
+  /** The address the closing view's QR code points to. */
+  url: string | null;
 }
 
 const GENERATOR = '<meta name="generator" content="Pathway">';
@@ -55,9 +59,9 @@ function prepareOut(out: string, deckPath: string): void {
 
 export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResult {
   const check = checkDeck(deckPath, nodeIo, { notes: opts.withNotes ? opts.notes : null });
-  if (check.summary.errors && !opts.force) return { check, out: null, files: [], notes: null, skinFonts: [] };
+  if (check.summary.errors && !opts.force) return { check, out: null, files: [], notes: null, skinFonts: [], url: null };
   const out = opts.out ?? defaultOutDir(deckPath);
-  const { payload, media } = compileDeck(check, nodeIo, { notes: !!opts.withNotes });
+  const { payload, media } = compileDeck(check, nodeIo, { notes: !!opts.withNotes, url: opts.url });
   const assets = loadAssets(check.skin);
   prepareOut(out, deckPath);
 
@@ -84,6 +88,7 @@ export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResul
   return {
     check, out, files: files.map(f => f.split(sep).join("/")),
     notes: payload.notes ? Object.keys(payload.notes).length : null,
+    url: payload.handoff?.url ?? null,
     skinFonts: assets.fonts.filter(f => !f.builtin).map(f => basename(f.from)),
   };
 }

@@ -63,6 +63,10 @@ export interface Payload {
   routes: PayloadRoute[];
   /** Speaker notes as HTML by stop id. Null when the build leaves them out. */
   notes: Record<string, string> | null;
+  /** The deck's bottom line, as HTML, shown first on phones and last in the talk. */
+  takeaways: string | null;
+  /** Where the audience copy lives, and its QR code as SVG. */
+  handoff: { url: string; qr: string } | null;
   /** True when served by `pathway present`, which reloads the page on changes. */
   dev: boolean;
   /** For `pathway present`: what the checker found, shown over the deck. */

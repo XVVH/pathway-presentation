@@ -1,6 +1,7 @@
 // The markdown-it instance Pathway parses with: CommonMark plus tables, raw
 // HTML recognised (so the checker can flag it), [[wiki links]] to stops, and
-// speaker notes in Pandoc's fenced-div form (::: notes ... :::).
+// asides in Pandoc's fenced-div form: speaker notes (::: notes ... :::) and the
+// deck's bottom line (::: takeaways ... :::). Neither is ever on a card.
 
 import MarkdownIt from "markdown-it";
 import type { MarkdownIt as Md, StateBlock, StateInline, Token } from "markdown-it";
@@ -26,20 +27,22 @@ function wikilink(state: StateInline, silent: boolean): boolean {
   return true;
 }
 
-const NOTES_OPEN = /^(:{3,})[ \t]*(?:notes|\{[ \t]*\.notes[ \t]*\})[ \t]*:*[ \t]*$/;
+export type AsideKind = "notes" | "takeaways";
+const ASIDE_OPEN = /^(:{3,})[ \t]*(?:(notes|takeaways)|\{[ \t]*\.(notes|takeaways)[ \t]*\})[ \t]*:*[ \t]*$/;
 const FENCE_CLOSE = /^:{3,}[ \t]*$/;
 const HEADING = /^#{1,6}(?:[ \t]|$)/;
 
 /**
- * Speaker notes: `::: notes` (or `::: {.notes}`) up to a line of `:::`. The
- * notes are Markdown. A heading always ends them, closed or not, because a
- * heading is the next stop: forgetting the `:::` can't swallow the deck.
+ * An aside: `::: notes` or `::: takeaways` (or `::: {.notes}`) up to a line of
+ * `:::`. Its content is Markdown. A heading always ends it, closed or not,
+ * because a heading is the next stop: forgetting the `:::` can't swallow the deck.
  */
-function notesBlock(state: StateBlock, startLine: number, endLine: number, silent: boolean): boolean {
+function asideBlock(state: StateBlock, startLine: number, endLine: number, silent: boolean): boolean {
   const lineText = (n: number) => state.src.slice(state.bMarks[n] + state.tShift[n], state.eMarks[n]);
   if (state.sCount[startLine] - state.blkIndent >= 4) return false;
-  const open = NOTES_OPEN.exec(lineText(startLine));
+  const open = ASIDE_OPEN.exec(lineText(startLine));
   if (!open) return false;
+  const kind = (open[2] ?? open[3]) as AsideKind;
   if (silent) return true;
   let next = startLine + 1, closed = false, code: string | null = null;
   for (; next < endLine; next++) {
@@ -59,13 +62,13 @@ function notesBlock(state: StateBlock, startLine: number, endLine: number, silen
   const oldParent = state.parentType, oldMax = state.lineMax;
   state.parentType = "blockquote";
   state.lineMax = next;
-  const openToken = state.push("notes_open", "div", 1);
+  const openToken = state.push("aside_open", "div", 1);
   openToken.block = true;
   openToken.markup = open[1];
   openToken.map = [startLine, closed ? next + 1 : next];
-  openToken.meta = { closed };
+  openToken.meta = { closed, kind };
   state.md.block.tokenize(state, startLine + 1, next);
-  const closeToken = state.push("notes_close", "div", -1);
+  const closeToken = state.push("aside_close", "div", -1);
   closeToken.block = true;
   state.parentType = oldParent;
   state.lineMax = oldMax;
@@ -76,21 +79,21 @@ function notesBlock(state: StateBlock, startLine: number, endLine: number, silen
 export function createMarkdown(): Md {
   const md = new MarkdownIt({ html: true });
   md.inline.ruler.before("link", "wikilink", wikilink);
-  md.block.ruler.before("fence", "notes", notesBlock, { alt: ["paragraph", "reference", "blockquote", "list"] });
+  md.block.ruler.before("fence", "aside", asideBlock, { alt: ["paragraph", "reference", "blockquote", "list"] });
   return md;
 }
 
-/** Splits a run of block tokens into what's shown and the notes blocks inside it. */
-export function splitNotes(tokens: readonly Token[]): { shown: Token[]; notes: Token[][] } {
-  const shown: Token[] = [], notes: Token[][] = [];
+/** Splits a run of block tokens into what the card shows and the asides inside it. */
+export function splitAsides(tokens: readonly Token[]): { shown: Token[]; asides: { kind: AsideKind; tokens: Token[] }[] } {
+  const shown: Token[] = [], asides: { kind: AsideKind; tokens: Token[] }[] = [];
   let depth = 0;
   for (const t of tokens) {
-    if (t.type === "notes_open") { if (depth++ === 0) notes.push([]); }
-    if (depth) notes[notes.length - 1].push(t);
+    if (t.type === "aside_open" && depth++ === 0) asides.push({ kind: (t.meta as { kind: AsideKind }).kind, tokens: [] });
+    if (depth) asides[asides.length - 1].tokens.push(t);
     else shown.push(t);
-    if (t.type === "notes_close") depth--;
+    if (t.type === "aside_close") depth--;
   }
-  return { shown, notes };
+  return { shown, asides };
 }
 
 /** Flattens inline tokens into styled runs of text, for word counts and wrapping. */
