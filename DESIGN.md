@@ -319,6 +319,13 @@ deliberate act: C (or "Carry on from here" in the presenter window), offered onl
 when the route passes the stop you're looking at. A link to a stop
 (`index.html#stop-id`) starts the talk there.
 
+Looks don't draw the trail either. The lit trail records the talk as presented: the
+route walked, and the detours taken. Rejoining lights the route's own trail from
+where your place was, not the way back from wherever you looked, and a stop you only
+looked at doesn't count as visited. If you carry on from a stop further along, the
+stretch you skipped stays unlit, so the closing view of the whole trail shows what
+you left out.
+
 ### 13. The presenter window follows the audience window
 
 Press P and the deck opens a second window of itself, in presenter mode: your notes

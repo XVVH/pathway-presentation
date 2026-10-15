@@ -160,6 +160,28 @@ test("timeline: neighbours ride the trail and light it; arrival marks the stop v
   assert.ok(Math.abs(end.x - want.x) < 1e-6 && Math.abs(end.w - want.w) < 1e-6);
 });
 
+test("timeline: a look lights no trail and visits no stop", () => {
+  const map = world(), c = ctx(map);
+  const tl = new Timeline(camForTarget(c.viewport, map, { kind: "stop", id: "a" }), { kind: "stop", id: "a" });
+  const seg = flyTo(tl, 0, { kind: "stop", id: "b1" }, c, { lightFrom: null });
+  assert.deepEqual(seg.edges, []);
+  const after = tl.litAt(seg.dur + 1);
+  assert.equal(after.lit.size, 0);
+  assert.ok(!after.visited.has("b1"));
+});
+
+test("timeline: rejoining lights the route's own trail, not the way back from a look", () => {
+  const map = world(), c = ctx(map);
+  const tl = new Timeline(camForTarget(c.viewport, map, { kind: "stop", id: "a" }), { kind: "stop", id: "a" });
+  const look = flyTo(tl, 0, { kind: "stop", id: "d" }, c, { lightFrom: null });
+  // Your place was a; → goes on to a1, from wherever the camera is.
+  const rejoin = flyTo(tl, look.dur + 1, { kind: "stop", id: "a1" }, c, { lightFrom: { kind: "stop", id: "a" } });
+  assert.deepEqual(rejoin.edges.map(e => e.id), ["a1"]);
+  const { lit, visited } = tl.litAt(look.dur + rejoin.dur + 2);
+  assert.deepEqual([...lit.keys()], ["a1"]);
+  assert.ok(visited.has("a1") && !visited.has("d"));
+});
+
 test("timeline: remote moves are short; reduced motion fades", () => {
   const map = world();
   for (const [profile, kind, max] of [["remote", "fly", 0.9], ["reduced", "fade", 0.45]] as const) {
@@ -233,6 +255,9 @@ test("navigator: C carries on from a stop the route passes, and only then", () =
   nav.visit("a2x");
   nav.surface();
   assert.deepEqual(nav.current(), { kind: "lookback", id: "a2" });
+  assert.equal(nav.canContinueHere(), false);
+  // Nor is the whole map, though every route starts there.
+  nav.showMap();
   assert.equal(nav.canContinueHere(), false);
 });
 

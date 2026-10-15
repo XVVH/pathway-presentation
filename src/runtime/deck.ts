@@ -112,9 +112,20 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   }
 
   // ------------------------------------------------------------ moving
-  function go(target: Target | null): void {
-    if (!target) return;
-    flyTo(live, now(), target, motion());
+  /**
+   * Makes a move and lights what it walks: the route's own trail when it lands
+   * on the route (from where your place was), a detour's as you walk it, and
+   * nothing for a look (a click, ↑, the map), which leaves the trail as the talk drew it.
+   */
+  function move(f: () => Target | null): boolean {
+    const leftAt = nav.route[nav.ri];
+    const target = f();
+    if (!target) return false;
+    fly(target, !nav.offRoute ? leftAt : nav.excursion ? undefined : null);
+    return true;
+  }
+  function fly(target: Target, lightFrom: Target | null | undefined): void {
+    flyTo(live, now(), target, motion(), { lightFrom });
     hoverNode = null;
     dirty = true;
     updateHud();
@@ -122,19 +133,24 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     link.send();
   }
   const presenting = () => mode === "live" && !stripMode;
-  const act = (f: () => Target | null) => () => { if (!presenting()) return; introHint = false; go(f()); };
+  const act = (f: () => Target | null) => () => { if (!presenting()) return; introHint = false; move(f); };
   const next = act(() => nav.next()), prev = act(() => nav.prev()), dive = act(() => nav.dive()), surface = act(() => nav.surface());
-  const continueHere = act(() => nav.continueHere());
+  // Carrying on from a stop makes it part of the talk, but walks nothing: you're already there.
+  function continueHere(): void {
+    if (!presenting()) return;
+    const t = nav.continueHere();
+    if (t) fly(t, t);
+  }
   function showMap(): void {
     if (mode !== "live") return;
     if (stripMode) { closeMap(null); return; }
-    go(nav.showMap());
+    move(() => nav.showMap());
   }
   function visit(n: MapNode): void {
     if (mode !== "live") return;
     if (stripMode) { closeMap(n); return; }
     introHint = false;
-    go(nav.visit(n.id));
+    move(() => nav.visit(n.id));
   }
   function manualCam(cam: Cam): void {
     if (mode !== "live") return;
@@ -167,7 +183,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
     docEl.classList.remove("touring");
     hud.buttons.tour.lastElementChild!.textContent = "Play tour";
     live.segs.push({ t0: now(), dur: 0, from: cam, to: cam, kind: "cut", target: { kind: "map" }, edges: [], total: 0 });
-    go(nav.goTo(nav.ri));
+    move(() => nav.goTo(nav.ri));
   }
   function tourTime(): number {
     if (!tour) return 0;
@@ -263,7 +279,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       while (a.parent && a.parent !== map.root) a = a.parent;
       const tgt: Target = a !== map.root && a.seq.length ? { kind: "lookback", id: a.id } : { kind: "map" };
       nav.here = tgt;
-      flyTo(live, now(), tgt, motion());
+      flyTo(live, now(), tgt, motion(), { lightFrom: null });
     }
     dirty = true;
     updateHud();
@@ -347,9 +363,9 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
       case "map": showMap(); break;
       case "blank": setBlank(!blank); break;
       case "continue": continueHere(); break;
-      case "detour": if (presenting()) go(nav.takeDetour(c.id)); break;
+      case "detour": if (presenting()) move(() => nav.takeDetour(c.id)); break;
       case "visit": { const n = map.byId.get(c.id); if (n) visit(n); break; }
-      case "route": if (presenting()) { const t = nav.useRoute(c.name); if (t) go(t); else { updateHud(); savePosition(); link.send(); } } break;
+      case "route": if (presenting() && !move(() => nav.useRoute(c.name))) { updateHud(); savePosition(); link.send(); } break;
     }
   }
   /** A short message in the status line, for things the presenter should know now. */
@@ -394,7 +410,7 @@ export function startDeck(payload: Payload, params: URLSearchParams): void {
   const keyMap: Record<string, () => void> = {
     ArrowRight: next, " ": next, PageDown: next, Enter: next, ArrowLeft: prev, PageUp: prev, Backspace: prev,
     ArrowDown: dive, ArrowUp: surface, m: showMap, M: showMap, Escape: () => (mode === "tour" ? exitTour() : showMap()),
-    Home: () => { if (presenting()) go(nav.goTo(0)); }, End: () => { if (presenting()) go(nav.goTo(nav.route.length - 1)); },
+    Home: () => { if (presenting()) move(() => nav.goTo(0)); }, End: () => { if (presenting()) move(() => nav.goTo(nav.route.length - 1)); },
     r: toggleMotion, R: toggleMotion, v: toggleTour, V: toggleTour, p: () => link.open(), P: () => link.open(),
     h: () => { hoverOn = !hoverOn; hoverNode = null; dirty = true; }, H: () => { hoverOn = !hoverOn; hoverNode = null; dirty = true; },
     b: () => setBlank(!blank), B: () => setBlank(!blank), ".": () => setBlank(!blank),

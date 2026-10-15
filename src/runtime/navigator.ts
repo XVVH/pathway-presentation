@@ -146,7 +146,9 @@ export class Navigator {
   /** True when you've looked away to a target the route passes, so C can make it your place. */
   canContinueHere(): boolean {
     if (!this.offRoute) return false;
+    // The whole map is where a route starts and ends, not a place to carry on from.
     const t = this.current();
+    if (t.kind === "map") return false;
     return this.route.some((s, j) => j !== this.ri && sameTarget(s, t));
   }
 

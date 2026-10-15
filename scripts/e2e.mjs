@@ -98,9 +98,12 @@ await step("a detour from the presenter, then → rejoins", async () => {
 });
 
 await step("a click is a look: → comes back, C carries on from there", async () => {
+  const walked = () => deck.evaluate(() => JSON.parse(Object.entries(sessionStorage).find(([k]) => k.startsWith("pathway:pos:"))[1]).walked.sort());
+  const before = await walked();
   await deck.evaluate(() => { location.hash = "tilt"; });
   await settle(deck);
   expect(/OFF ROUTE/i.test(await status()), `deck status: ${await status()}`);
+  expect(JSON.stringify(await walked()) === JSON.stringify(before), `a look lit trails: ${await walked()}`);
   await deck.keyboard.press("ArrowRight");
   await settle(deck);
   expect(/LOOK BACK OVER DECKS ARE CORRIDORS/i.test(await status()), `didn't rejoin: ${await status()}`);
@@ -113,6 +116,8 @@ await step("a click is a look: → comes back, C carries on from there", async (
   await settle(deck);
   expect(/STOP 09/i.test(await status()), `deck status: ${await status()}`);
   expect(await presenter.locator("#p-continue").isHidden(), "carry-on button still shown");
+  const after = await walked();
+  expect(!after.includes("motion") && !after.includes("tilt"), `skipped trails lit: ${after}`);
 });
 
 await step("choosing a named route in the presenter", async () => {
@@ -158,6 +163,7 @@ await step("the tour plays and scrubs", async () => {
 await step("the whole map", async () => {
   await deck.keyboard.press("m");
   await settle(deck);
+  expect(!/C CARRIES ON/i.test(await status()), `carry-on offered on the map: ${await status()}`);
   await shot(deck, "07-map");
 });
 

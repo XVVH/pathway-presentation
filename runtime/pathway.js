@@ -963,6 +963,7 @@
     canContinueHere() {
       if (!this.offRoute) return false;
       const t = this.current();
+      if (t.kind === "map") return false;
       return this.route.some((s, j) => j !== this.ri && sameTarget(s, t));
     }
     /** C: carry on the talk from what you're looking at, instead of going back. */
@@ -1258,7 +1259,7 @@
         if (s.t0 > t) break;
         const end = Math.min(t, this.segs[i + 1]?.t0 ?? Infinity);
         const p = s.dur > 0 ? clamp((end - s.t0) / s.dur) : 1;
-        if (p >= 1 && s.target.kind !== "map" && s.kind !== "manual") visited.add(s.target.id);
+        if (p >= 1 && s.target.kind !== "map" && s.kind !== "manual" && !s.look) visited.add(s.target.id);
         if (!s.total) continue;
         const litLen = (s.ease ? s.ease(p) : p) * s.total;
         let acc = 0;
@@ -1276,7 +1277,7 @@
       return [...this.litAt(t).lit].filter(([, v]) => v.f >= 1).map(([id, v]) => ({ id, len: map.byId.get(id)?.edge?.len ?? 0, rev: v.rev }));
     }
   };
-  function makeSeg(tl, t0, toCam, target, ctx) {
+  function makeSeg(tl, t0, toCam, target, ctx, opts = {}) {
     const { map, profile, flight } = ctx;
     const { fade: _fade, ...from } = tl.camAt(t0);
     const fromTarget = tl.segAt(t0)[0].target;
@@ -1284,8 +1285,12 @@
     const toNode = target.kind === "map" ? null : targetNode(map, target);
     const { lit } = tl.litAt(t0);
     const path = fromNode && toNode ? trailPath(fromNode, toNode) : [];
-    const fresh = path.filter((e) => (lit.get(e.id)?.f ?? 0) < 1);
-    const base = { t0, from, to: toCam, target, edges: fresh, total: fresh.reduce((a, e) => a + e.len, 0) };
+    const look = opts.lightFrom === null;
+    const followsCamera = opts.lightFrom === void 0 || opts.lightFrom !== null && sameTarget(opts.lightFrom, fromTarget);
+    const lightNode = opts.lightFrom && opts.lightFrom.kind !== "map" ? targetNode(map, opts.lightFrom) : null;
+    const walk = look ? [] : followsCamera ? path : lightNode && toNode ? trailPath(lightNode, toNode) : [];
+    const fresh = walk.filter((e) => (lit.get(e.id)?.f ?? 0) < 1);
+    const base = { t0, from, to: toCam, target, edges: fresh, total: fresh.reduce((a, e) => a + e.len, 0), look };
     if (profile === "reduced") return { ...base, dur: 0.45, kind: "fade", ease: linear };
     const remote = profile === "remote";
     if (fromTarget.kind === "stop" && target.kind === "stop" && fromNode && toNode && path.length && path.length <= 3) {
@@ -1302,7 +1307,8 @@
           return { x: P.x + lerp(o0.x, o1.x, e), y: P.y + lerp(o0.y, o1.y, e), w: Math.exp(lerp(lw0, lw1, e)) * (1 + lift * Math.sin(Math.PI * e)) };
         };
         const dur2 = remote ? clamp(0.45 + 0.22 * screens, 0.55, 0.9) : clamp(1.15 + 0.6 * screens, 1.6, flight.max) / flight.speed;
-        return { ...base, kind: "fly", path: f, dur: dur2, ease: remote ? RAMP_REMOTE : RAMP, edges: path, total: poly.len };
+        const under = followsCamera && !look ? { edges: path, total: poly.len } : {};
+        return { ...base, kind: "fly", path: f, dur: dur2, ease: remote ? RAMP_REMOTE : RAMP, ...under };
       }
     }
     const zp = zoomPath(from, toCam, remote ? 1.05 : flight.rho);
@@ -1310,8 +1316,8 @@
     if (!(zp.S > 1e-4)) dur = 0.01;
     return { ...base, kind: "fly", path: zp.f, dur, ease: remote ? RAMP_REMOTE : RAMP };
   }
-  function flyTo(tl, t, target, ctx, cam = camForTarget(ctx.viewport, ctx.map, target)) {
-    const seg = makeSeg(tl, t, cam, target, ctx);
+  function flyTo(tl, t, target, ctx, opts = {}) {
+    const seg = makeSeg(tl, t, opts.cam ?? camForTarget(ctx.viewport, ctx.map, target), target, ctx, opts);
     tl.segs.push(seg);
     return seg;
   }
@@ -1410,9 +1416,15 @@
       const walked = live.walkedAt(now() + 60, map).map((s) => s.id);
       store.set(posKey, JSON.stringify({ route: nav.routeName, ri: nav.ri, here: nav.current(), offRoute: nav.offRoute || !!nav.excursion, walked }));
     }
-    function go(target) {
-      if (!target) return;
-      flyTo(live, now(), target, motion());
+    function move(f) {
+      const leftAt = nav.route[nav.ri];
+      const target = f();
+      if (!target) return false;
+      fly(target, !nav.offRoute ? leftAt : nav.excursion ? void 0 : null);
+      return true;
+    }
+    function fly(target, lightFrom) {
+      flyTo(live, now(), target, motion(), { lightFrom });
       hoverNode = null;
       dirty = true;
       updateHud();
@@ -1423,17 +1435,21 @@
     const act = (f) => () => {
       if (!presenting()) return;
       introHint = false;
-      go(f());
+      move(f);
     };
     const next = act(() => nav.next()), prev = act(() => nav.prev()), dive = act(() => nav.dive()), surface = act(() => nav.surface());
-    const continueHere = act(() => nav.continueHere());
+    function continueHere() {
+      if (!presenting()) return;
+      const t = nav.continueHere();
+      if (t) fly(t, t);
+    }
     function showMap() {
       if (mode !== "live") return;
       if (stripMode) {
         closeMap(null);
         return;
       }
-      go(nav.showMap());
+      move(() => nav.showMap());
     }
     function visit(n) {
       if (mode !== "live") return;
@@ -1442,7 +1458,7 @@
         return;
       }
       introHint = false;
-      go(nav.visit(n.id));
+      move(() => nav.visit(n.id));
     }
     function manualCam(cam) {
       if (mode !== "live") return;
@@ -1478,7 +1494,7 @@
       docEl.classList.remove("touring");
       hud.buttons.tour.lastElementChild.textContent = "Play tour";
       live.segs.push({ t0: now(), dur: 0, from: cam, to: cam, kind: "cut", target: { kind: "map" }, edges: [], total: 0 });
-      go(nav.goTo(nav.ri));
+      move(() => nav.goTo(nav.ri));
     }
     function tourTime() {
       if (!tour) return 0;
@@ -1588,7 +1604,7 @@
         while (a.parent && a.parent !== map.root) a = a.parent;
         const tgt = a !== map.root && a.seq.length ? { kind: "lookback", id: a.id } : { kind: "map" };
         nav.here = tgt;
-        flyTo(live, now(), tgt, motion());
+        flyTo(live, now(), tgt, motion(), { lightFrom: null });
       }
       dirty = true;
       updateHud();
@@ -1712,7 +1728,7 @@
           continueHere();
           break;
         case "detour":
-          if (presenting()) go(nav.takeDetour(c.id));
+          if (presenting()) move(() => nav.takeDetour(c.id));
           break;
         case "visit": {
           const n = map.byId.get(c.id);
@@ -1720,14 +1736,10 @@
           break;
         }
         case "route":
-          if (presenting()) {
-            const t = nav.useRoute(c.name);
-            if (t) go(t);
-            else {
-              updateHud();
-              savePosition();
-              link.send();
-            }
+          if (presenting() && !move(() => nav.useRoute(c.name))) {
+            updateHud();
+            savePosition();
+            link.send();
           }
           break;
       }
@@ -1787,10 +1799,10 @@
       M: showMap,
       Escape: () => mode === "tour" ? exitTour() : showMap(),
       Home: () => {
-        if (presenting()) go(nav.goTo(0));
+        if (presenting()) move(() => nav.goTo(0));
       },
       End: () => {
-        if (presenting()) go(nav.goTo(nav.route.length - 1));
+        if (presenting()) move(() => nav.goTo(nav.route.length - 1));
       },
       r: toggleMotion,
       R: toggleMotion,

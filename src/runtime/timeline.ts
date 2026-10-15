@@ -6,6 +6,7 @@ import type { Target } from "../payload.ts";
 import { camForTarget, fitNode, type Viewport } from "./camera.ts";
 import { clamp, lerp, rampEase, zoomPath, type Cam } from "./math.ts";
 import { targetNode, trailPath, trailPolyline, type TrailStep, type WorldMap } from "./map.ts";
+import { sameTarget } from "./navigator.ts";
 
 export type Profile = "cinematic" | "remote" | "reduced";
 
@@ -32,6 +33,18 @@ export interface Segment {
   total: number;
   path?: (t: number) => Cam;
   ease?: (t: number) => number;
+  /** A look, not part of the talk: it lights no trail and visits no stop. */
+  look?: boolean;
+}
+
+export interface MoveOptions {
+  /**
+   * Where the walk this move lights starts. By default, where the camera is
+   * now, so the trail draws under the camera. A target lights the trail from
+   * there instead (rejoining the route lights the route's own trail). Null
+   * makes the move a look, which lights nothing.
+   */
+  lightFrom?: Target | null;
 }
 
 export interface Frame extends Cam {
@@ -78,7 +91,7 @@ export class Timeline {
       if (s.t0 > t) break;
       const end = Math.min(t, this.segs[i + 1]?.t0 ?? Infinity);
       const p = s.dur > 0 ? clamp((end - s.t0) / s.dur) : 1;
-      if (p >= 1 && s.target.kind !== "map" && s.kind !== "manual") visited.add(s.target.id);
+      if (p >= 1 && s.target.kind !== "map" && s.kind !== "manual" && !s.look) visited.add(s.target.id);
       if (!s.total) continue;
       const litLen = (s.ease ? s.ease(p) : p) * s.total;
       let acc = 0;
@@ -99,7 +112,7 @@ export class Timeline {
 }
 
 /** The move from wherever the camera is at t0 to `toCam`, arriving at `target`. */
-export function makeSeg(tl: Timeline, t0: number, toCam: Cam, target: Target, ctx: MotionContext): Segment {
+export function makeSeg(tl: Timeline, t0: number, toCam: Cam, target: Target, ctx: MotionContext, opts: MoveOptions = {}): Segment {
   const { map, profile, flight } = ctx;
   const { fade: _fade, ...from } = tl.camAt(t0);
   const fromTarget = tl.segAt(t0)[0].target;
@@ -107,8 +120,12 @@ export function makeSeg(tl: Timeline, t0: number, toCam: Cam, target: Target, ct
   const toNode = target.kind === "map" ? null : targetNode(map, target);
   const { lit } = tl.litAt(t0);
   const path = fromNode && toNode ? trailPath(fromNode, toNode) : [];
-  const fresh = path.filter(e => (lit.get(e.id)?.f ?? 0) < 1);
-  const base = { t0, from, to: toCam, target, edges: fresh, total: fresh.reduce((a, e) => a + e.len, 0) };
+  const look = opts.lightFrom === null;
+  const followsCamera = opts.lightFrom === undefined || (opts.lightFrom !== null && sameTarget(opts.lightFrom, fromTarget));
+  const lightNode = opts.lightFrom && opts.lightFrom.kind !== "map" ? targetNode(map, opts.lightFrom) : null;
+  const walk = look ? [] : followsCamera ? path : lightNode && toNode ? trailPath(lightNode, toNode) : [];
+  const fresh = walk.filter(e => (lit.get(e.id)?.f ?? 0) < 1);
+  const base = { t0, from, to: toCam, target, edges: fresh, total: fresh.reduce((a, e) => a + e.len, 0), look };
   if (profile === "reduced") return { ...base, dur: 0.45, kind: "fade", ease: linear };
   const remote = profile === "remote";
 
@@ -129,7 +146,9 @@ export function makeSeg(tl: Timeline, t0: number, toCam: Cam, target: Target, ct
         return { x: P.x + lerp(o0.x, o1.x, e), y: P.y + lerp(o0.y, o1.y, e), w: Math.exp(lerp(lw0, lw1, e)) * (1 + lift * Math.sin(Math.PI * e)) };
       };
       const dur = remote ? clamp(0.45 + 0.22 * screens, 0.55, 0.9) : clamp(1.15 + 0.6 * screens, 1.6, flight.max) / flight.speed;
-      return { ...base, kind: "fly", path: f, dur, ease: remote ? RAMP_REMOTE : RAMP, edges: path, total: poly.len };
+      // Walking the trail the camera rides lights it exactly under the camera.
+      const under = followsCamera && !look ? { edges: path, total: poly.len } : {};
+      return { ...base, kind: "fly", path: f, dur, ease: remote ? RAMP_REMOTE : RAMP, ...under };
     }
   }
   // Longer jumps climb toward the ground the two ends share, then descend.
@@ -140,8 +159,8 @@ export function makeSeg(tl: Timeline, t0: number, toCam: Cam, target: Target, ct
 }
 
 /** Appends the move to `target` at time t, framed for this viewport. */
-export function flyTo(tl: Timeline, t: number, target: Target, ctx: MotionContext, cam = camForTarget(ctx.viewport, ctx.map, target)): Segment {
-  const seg = makeSeg(tl, t, cam, target, ctx);
+export function flyTo(tl: Timeline, t: number, target: Target, ctx: MotionContext, opts: MoveOptions & { cam?: Cam } = {}): Segment {
+  const seg = makeSeg(tl, t, opts.cam ?? camForTarget(ctx.viewport, ctx.map, target), target, ctx, opts);
   tl.segs.push(seg);
   return seg;
 }
