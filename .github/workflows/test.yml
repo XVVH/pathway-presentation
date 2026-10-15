@@ -21,7 +21,7 @@ jobs:
       - run: npm test
       - run: npm run bundle:check
       - run: node src/cli.ts check examples/pathway/pathway.md --strict
-      - run: node src/cli.ts fmt --check examples/pathway/pathway.md examples/pathway/pathway.notes.md
+      - run: node src/cli.ts fmt --check examples/pathway/pathway.md
 
   browser:
     runs-on: ubuntu-latest

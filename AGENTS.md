@@ -43,7 +43,6 @@ installed, say so rather than installing it unasked.
 ```
 my-talk/
   my-talk.md          the deck
-  my-talk.notes.md    speaker notes (optional, never shown to the audience)
   media/              images and video, referenced by relative path
 ```
 
@@ -65,6 +64,10 @@ Every team hits the same three walls.
 Requests arrive faster than anyone triages them.
 
 ![The intake funnel](media/funnel.svg)
+
+::: notes
+Ask who triaged anything this week. Pause on the funnel.
+:::
 
 ### Triage is a queue {.detour}
 Skipped by the route; one key away when someone asks. See [[intake]].
@@ -141,14 +144,20 @@ only, not titles or captions.
 
 ## Speaker notes
 
-`deck.notes.md` beside the deck, or set `notes: path` in the frontmatter. Each
-heading opens the notes for one stop:
+Write a stop's notes inside it, between `::: notes` and `:::` on lines of their
+own. They're Markdown, they're never on the card, and they don't count toward its
+density. They move with the stop, so renaming or reordering can't lose them.
 
-- **By title:** the same title as the stop (`## Intake`), at any heading level.
-- **By id:** `{#intake}` on the heading, which also works when the titles differ.
+- A stop can have more than one notes block; they're shown in order.
+- A heading ends notes even without the closing `:::`. The checker flags that
+  (`notes-unclosed`), with a safe fix.
+- Notes are private: builds leave them out unless `--with-notes` is given.
 
-Notes before the first heading, or under a heading that matches no stop, are
-flagged.
+**A separate notes file** (`deck.notes.md` beside the deck, or `notes: path` in the
+frontmatter) also works. Each heading in it opens the notes for one stop, by the
+stop's title or by `{#id}` on the heading. Renaming a stop breaks a match by
+title, so prefer inline notes. `pathway inline-notes deck.md --write` moves a notes
+file into the deck.
 
 ## Routes
 
@@ -209,4 +218,5 @@ flagged.
   `media-outside-deck`, `unsupported-media`
 - **Names and keys:** `unknown-attribute`, `unknown-frontmatter-key`,
   `unknown-skin`, `route-duplicate-stop`, `raw-html`
-- **Notes:** `notes-orphan`, `notes-duplicate`, `notes-preamble`
+- **Notes:** `notes-unclosed`, `notes-orphan`, `notes-ambiguous`, `notes-duplicate`,
+  `notes-preamble`

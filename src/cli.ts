@@ -1,11 +1,12 @@
 // The `pathway` command.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { buildDeck, displayPath } from "./build.ts";
 import { checkDeck, type CheckResult } from "./check.ts";
 import { applyEdits, safeEdits } from "./fix.ts";
 import { formatDeck } from "./fmt.ts";
+import { planInlineNotes } from "./inline-notes.ts";
 import { checkJson, formatCheck, formatOutline, outlineJson } from "./format.ts";
 import { nodeIo } from "./io-node.ts";
 import { plural } from "./text.ts";
@@ -22,6 +23,10 @@ Commands
   build <deck.md>     Make a folder to present from anywhere, offline: open its
                       index.html in a browser. Notes stay out unless asked for.
   fmt <file.md>...    Tidy a deck's layout without changing what it says.
+  inline-notes <deck.md>
+                      Move a separate notes file into the deck, as ::: notes
+                      blocks under each stop. Shows what would move; --write
+                      moves it.
   render <deck.md>    Save pictures of stops, as the audience sees them.
                       Needs Playwright.
 
@@ -37,7 +42,7 @@ Options
                       Anyone with the folder can read them.
   --force             build: build even when the deck has errors.
   --port <n>          present: the port (default 4310; 0 picks a free one).
-  --write             fmt: rewrite the files in place.
+  --write             fmt: rewrite the files in place. inline-notes: move the notes.
   --check             fmt: exit 1 if any file would change.
   --stop <id>         render: a stop to picture (repeat for more).
   --map               render: the whole map.
@@ -49,7 +54,7 @@ Options
   -v, --version       Show the version.
 `;
 
-const COMMANDS = ["check", "outline", "present", "build", "fmt", "render"];
+const COMMANDS = ["check", "outline", "present", "build", "fmt", "render", "inline-notes"];
 
 async function main(argv: string[]): Promise<number> {
   let parsed;
@@ -124,7 +129,8 @@ async function main(argv: string[]): Promise<number> {
       if (result.check.summary.warnings || result.check.summary.errors) process.stderr.write(`${formatCheck(result.check, { color })}\n\n`);
       const media = result.files.filter(f => f !== "index.html" && !f.startsWith("fonts/")).length;
       process.stdout.write(`Built ${displayPath(result.out)}/index.html (${plural(media, "media file")}). Open it in a browser to present.\n`);
-      if (o["with-notes"]) process.stderr.write("Speaker notes are included: anyone with this folder can read them.\n");
+      if (result.notes === 0) process.stderr.write("There were no speaker notes to include: none in the deck, and no notes file.\n");
+      else if (result.notes) process.stderr.write(`Speaker notes for ${plural(result.notes, "stop")} are included: anyone with this folder can read them.\n`);
       return 0;
     }
 
@@ -174,6 +180,21 @@ async function main(argv: string[]): Promise<number> {
         else process.stderr.write(`${f} isn't tidy. Run: pathway fmt --write ${f}\n`);
       }
       return o.check && untidy ? 1 : 0;
+    }
+
+    case "inline-notes": {
+      const result = checkDeck(deckPath, nodeIo, { notes: o.notes });
+      const plan = planInlineNotes(result, nodeIo);
+      if (!plan) { process.stderr.write(`There's no notes file to move${o.notes ? ` at ${o.notes}` : " beside the deck"}.\n`); return 1; }
+      const notesFile = result.notes!.file;
+      const verb = o.write ? "Moved" : "Would move";
+      process.stdout.write(`${verb} notes for ${plural(plan.moved.length, "stop")} from ${notesFile} into ${deckPath}.\n`);
+      for (const k of plan.kept) process.stdout.write(`  Stays in ${notesFile}: '${k.title}' (line ${k.line}), because ${k.reason}.\n`);
+      if (!o.write) { process.stdout.write("Nothing changed yet. Run again with --write to move them.\n"); return 0; }
+      writeFileSync(deckPath, plan.deck);
+      if (plan.rest === null) { rmSync(notesFile); process.stdout.write(`Removed ${notesFile}: nothing was left in it.\n`); }
+      else writeFileSync(notesFile, plan.rest);
+      return 0;
     }
 
     case "render": {

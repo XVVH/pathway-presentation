@@ -108,10 +108,38 @@ Same failure as [[intake]], different costume.
 - Headings are stations. Heading depth is distance from the trunk.
 - Attributes use Pandoc's `{#id .class key=value}`, and links use `[[wiki-links]]`.
   LLMs already know both, which makes agent-written decks valid on the first try.
-- Speaker notes live in a sidecar, `talk.notes.md`, with matching headings. The checker
-  flags notes that drift from the deck.
+- Speaker notes sit under their stop, between `::: notes` and `:::` (Pandoc's own
+  syntax for reveal.js speaker notes). They move when the stop moves, and renaming
+  can't break them. A separate `talk.notes.md` with matching headings still works,
+  for notes kept apart from the deck; see 3a.
 - Authors write text. Agents get JSON back out: the parsed tree and diagnostics with
   line numbers.
+
+### 3a. Notes live with their stop
+
+Notes first lived in a separate file, matched to stops by heading. That breaks
+whenever a stop is renamed or moved, which is most of the time while a talk is
+being written. Now they're written inside the stop:
+
+```markdown
+## Intake {#intake}
+Requests arrive faster than anyone triages them.
+
+::: notes
+Ask who triaged anything this week. Pause on the funnel.
+:::
+```
+
+- Cutting and pasting a stop takes its notes along. There is nothing to link.
+- A heading always ends the notes, even without the closing `:::`, so a forgotten
+  fence can't swallow the rest of the deck. The checker flags it, with a safe fix.
+- Notes never count toward what a card holds.
+- The separate file still works, for people who want notes physically apart (to
+  share a deck's source without them). The checker flags notes in both places, and a
+  title shared by two stops, which attaches to neither. `pathway inline-notes` moves
+  a notes file into the deck in one step.
+- Sharing the deck's source now shares its notes. Builds still leave them out unless
+  asked.
 
 ### 4. A deck is a folder, not a single file
 

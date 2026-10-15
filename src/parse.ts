@@ -5,7 +5,7 @@
 import type { Token } from "markdown-it";
 import { parseAttrs, splitTrailingAttrs } from "./attrs.ts";
 import { readFrontmatter } from "./frontmatter.ts";
-import { createMarkdown, figureParts, runsOf, runsText } from "./markdown.ts";
+import { createMarkdown, figureParts, runsOf, runsText, splitNotes } from "./markdown.ts";
 import { mediaKind, isRemote } from "./media.ts";
 import type { Block, Deck, Diagnostic, ListItem, MediaRef, Stop, WikiLink } from "./model.ts";
 import { closest, countWords, slugify } from "./text.ts";
@@ -70,6 +70,17 @@ export function parseDeck(source: string, file: string): Deck {
   // and edits that insert after it don't collide.
   const trim = (start: number, end: number) => { while (end > start && !lines[end - 1]?.trim()) end--; return end; };
   for (const s of stops) for (const b of s.blocks) b.endLine = trim(b.line, b.endLine);
+  for (const s of stops) {
+    for (const n of s.notes) {
+      if (n.closed) continue;
+      n.endLine = trim(n.line, n.endLine);
+      diag({
+        code: "notes-unclosed", severity: "warning", line: n.line, stop: s.id,
+        message: "These notes have no closing ':::', so they run to the next heading. Close them with ':::' on its own line.",
+        fix: { description: "Close the notes after their last line.", safe: true, edits: [{ file, startLine: n.endLine + 1, endLine: n.endLine + 1, newText: ":::" }] },
+      });
+    }
+  }
   // A stop's body runs until the next heading.
   stops.forEach((s, k) => {
     let end = k + 1 < stops.length ? stops[k + 1].line - 1 : lines.length;
@@ -132,20 +143,28 @@ function startStop(open: Token, inline: Token, file: string, diag: (d: Omit<Diag
   return {
     id, idExplicit: !!attrs.id, title, level, depth: 0, line, endLine: line,
     classes: attrs.classes, attrs: attrs.kv, detour: attrs.classes.includes("detour"), density,
-    parent: null, children: [], blocks: [], links: [], media: [], words: 0,
+    parent: null, children: [], blocks: [], links: [], media: [], words: 0, notes: [],
   };
 }
 
-function addBlock(stop: Stop, slice: Token[], file: string, diag: (d: Omit<Diagnostic, "file">) => void) {
-  const first = slice[0];
-  const line = lineOf(first), endLine = endLineOf(first);
-  const inlines = slice.filter(t => t.type === "inline");
-
-  // Links, raw HTML and stray headings anywhere in the block.
-  for (const inl of inlines) {
+function addBlock(stop: Stop, all: Token[], file: string, diag: (d: Omit<Diagnostic, "file">) => void) {
+  // Links and raw HTML anywhere in the block, notes included.
+  for (const inl of all.filter(t => t.type === "inline")) {
     for (const c of inl.children ?? []) if (c.type === "wikilink") stop.links.push(wikiPosition(inl, c));
     if (inl.children?.some(c => c.type === "html_inline")) diag({ code: "raw-html", severity: "warning", line: lineOf(inl), stop: stop.id, message: "Raw HTML isn't rendered. Use Markdown, so the stop works on the map, in the strip and in video." });
   }
+
+  // Speaker notes belong to the stop but never to its card.
+  const { shown: slice, notes } = splitNotes(all);
+  for (const n of notes) {
+    const open = n[0], closed = !!(open.meta as { closed?: boolean } | null)?.closed;
+    const words = n.filter(t => t.type === "inline").reduce((a, t) => a + countWords(runsText(runsOf(t.children))), 0);
+    stop.notes.push({ line: lineOf(open), endLine: endLineOf(open), closed, words });
+  }
+  if (!slice.length) return;
+  const first = slice[0];
+  const line = lineOf(first), endLine = endLineOf(first);
+  const inlines = slice.filter(t => t.type === "inline");
   for (const t of slice) if (t.type === "heading_open") diag({ code: "nested-heading", severity: "warning", line: lineOf(t), stop: stop.id, message: "A heading inside a list or quote doesn't become a stop. Move it to the start of a line." });
 
   let block: Block | null = null;

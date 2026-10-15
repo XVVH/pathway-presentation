@@ -26,6 +26,8 @@ export interface BuildResult {
   /** Null when the deck has errors and the build was refused. */
   out: string | null;
   files: string[];
+  /** How many stops' notes went in; null when notes were left out. */
+  notes: number | null;
 }
 
 const GENERATOR = '<meta name="generator" content="Pathway">';
@@ -51,7 +53,7 @@ function prepareOut(out: string, deckPath: string): void {
 
 export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResult {
   const check = checkDeck(deckPath, nodeIo, { notes: opts.withNotes ? opts.notes : null });
-  if (check.summary.errors && !opts.force) return { check, out: null, files: [] };
+  if (check.summary.errors && !opts.force) return { check, out: null, files: [], notes: null };
   const out = opts.out ?? defaultOutDir(deckPath);
   const { payload, media } = compileDeck(check, nodeIo, { notes: !!opts.withNotes });
   const assets = loadAssets(payload.skin);
@@ -77,7 +79,7 @@ export function buildDeck(deckPath: string, opts: BuildOptions = {}): BuildResul
   for (const f of assets.fonts) copy(join(fontsDir, f), `fonts/${f}`);
   // The fonts' licence travels with them.
   for (const f of readdirSync(fontsDir).filter(f => f.startsWith("OFL"))) copy(join(fontsDir, f), `fonts/${f}`);
-  return { check, out, files: files.map(f => f.split(sep).join("/")) };
+  return { check, out, files: files.map(f => f.split(sep).join("/")), notes: payload.notes ? Object.keys(payload.notes).length : null };
 }
 
 /** A path for messages: relative to the working directory when that's shorter. */

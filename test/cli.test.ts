@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -21,7 +21,7 @@ test("check: a clean deck exits 0, and --json reports the summary", () => {
   assert.equal(r.code, 0);
   const json = JSON.parse(r.out);
   assert.equal(json.version, 1);
-  assert.equal(json.notes, "examples/pathway/pathway.notes.md");
+  assert.equal(json.notes, null, "the example's notes are written in the deck");
   assert.deepEqual(json.summary, { errors: 0, warnings: 0, infos: 0, stops: 19, detours: 3, withNotes: 12 });
   assert.deepEqual(json.diagnostics, []);
 });
@@ -68,7 +68,7 @@ test("outline: the tree, the route, and the same as JSON", () => {
   const json = JSON.parse(run("outline", "examples/pathway/pathway.md", "--json").out);
   assert.equal(json.stops.length, 19);
   assert.deepEqual(json.stops[1], {
-    id: "corridors", title: "Decks are corridors", line: 13, level: 2, depth: 1, parent: "pathway",
+    id: "corridors", title: "Decks are corridors", line: 17, level: 2, depth: 1, parent: "pathway",
     children: ["prezi", "impress", "powerpoint"], detour: false, density: null, words: 35, bullets: 3,
     media: [], links: [], hasNotes: true, card: json.stops[1].card,
   });
@@ -96,8 +96,9 @@ test("build: refuses a broken deck, builds a clean one, and says where", () => {
   assert.equal(ok.code, 0);
   assert.match(ok.out, /Built .*deck-build\/index\.html \(0 media files\)/);
   assert.match(readFileSync(join(dir, "deck-build", "index.html"), "utf8"), /<title>T<\/title>/);
-  const notes = run("build", join(dir, "deck.md"), "--with-notes");
-  assert.match(notes.err, /Speaker notes are included/);
+  assert.match(run("build", join(dir, "deck.md"), "--with-notes").err, /There were no speaker notes to include/);
+  writeFileSync(join(dir, "deck.md"), "# T\n\n## A\nFine.\n\n::: notes\nSay hello.\n:::\n");
+  assert.match(run("build", join(dir, "deck.md"), "--with-notes").err, /Speaker notes for 1 stop are included/);
 });
 
 test("fmt: prints, checks or rewrites", () => {
@@ -114,4 +115,21 @@ test("render and present explain their options", () => {
   assert.equal(run("render", "examples/pathway/pathway.md").code, 2);
   assert.equal(run("render", "examples/pathway/pathway.md", "--map", "--size", "big").code, 2);
   assert.equal(run("present", "examples/pathway/pathway.md", "--port", "99999").code, 2);
+});
+
+test("inline-notes: shows what would move, then moves it and removes the empty notes file", () => {
+  const dir = scratch({ "deck.md": "# T\n\n## A\nOne.\n\n## B\nTwo.\n", "deck.notes.md": "## A\nSay one.\n\n## Gone\nLost.\n" });
+  const dry = run("inline-notes", join(dir, "deck.md"));
+  assert.equal(dry.code, 0);
+  assert.match(dry.out, /Would move notes for 1 stop/);
+  assert.match(dry.out, /Stays in .*'Gone' \(line 4\), because it matches no stop/);
+  assert.equal(readFileSync(join(dir, "deck.md"), "utf8"), "# T\n\n## A\nOne.\n\n## B\nTwo.\n", "a dry run changes nothing");
+  assert.equal(run("inline-notes", join(dir, "deck.md"), "--write").code, 0);
+  assert.equal(readFileSync(join(dir, "deck.md"), "utf8"), "# T\n\n## A\nOne.\n\n::: notes\nSay one.\n:::\n\n## B\nTwo.\n");
+  assert.equal(readFileSync(join(dir, "deck.notes.md"), "utf8"), "## Gone\nLost.\n");
+  writeFileSync(join(dir, "deck.notes.md"), "## B\nSay two.\n");
+  run("inline-notes", join(dir, "deck.md"), "--write");
+  assert.ok(!existsSync(join(dir, "deck.notes.md")));
+  assert.match(readFileSync(join(dir, "deck.md"), "utf8"), /## B\nTwo\.\n\n::: notes\nSay two\.\n:::\n$/);
+  assert.equal(run("inline-notes", join(dir, "deck.md")).code, 1, "nothing left to move");
 });

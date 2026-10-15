@@ -103,6 +103,17 @@ export interface Stop {
   media: MediaRef[];
   /** Words of body text: paragraphs, list items, quotes and tables. */
   words: number;
+  /** Speaker notes written in the stop, as `::: notes` blocks. Never shown on the card. */
+  notes: InlineNotes[];
+}
+
+export interface InlineNotes {
+  /** The `::: notes` line. */
+  line: number;
+  /** The closing `:::` line, or the last line of notes when it's missing. */
+  endLine: number;
+  closed: boolean;
+  words: number;
 }
 
 export interface NamedRoute {
@@ -135,6 +146,8 @@ export interface NotesSection {
   id: string;
   /** True when the heading names its stop with {#id}; otherwise it matches by title. */
   explicitId: boolean;
+  /** Set by the checker when the section belongs to a stop; its id is then that stop's. */
+  matched: boolean;
   title: string;
   /** Line of the heading. */
   line: number;

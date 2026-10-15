@@ -29,7 +29,7 @@ export function parseNotes(source: string, file: string): Notes {
       const line = (t.map?.[0] ?? 0) + 1;
       for (const e of attrs.errors) diagnostics.push({ code: "bad-attribute", severity: "error", file, line, message: `In this heading's {…}: ${e}.` });
       if (sections.length) sections[sections.length - 1].endLine = line - 1;
-      sections.push({ id: attrs.id ?? slugify(title), explicitId: !!attrs.id, title, line, endLine: lines, words: 0 });
+      sections.push({ id: attrs.id ?? slugify(title), explicitId: !!attrs.id, matched: false, title, line, endLine: lines, words: 0 });
       continue;
     }
     if (t.type === "inline") {

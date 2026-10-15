@@ -80,14 +80,16 @@ export function compileDeck(result: CheckResult, io: Io, opts: CompileOptions = 
   let notes: Record<string, string> | null = null;
   if (opts.notes) {
     notes = {};
+    const add = (id: string, html: string) => { if (html) notes![id] = notes![id] ? `${notes![id]}\n${html}` : html; };
+    // Notes written in the deck, under their stop...
+    for (const s of deck.stops) {
+      for (const n of s.notes) add(s.id, renderBody(bodyLines(deck.lines, n.line, n.closed ? n.endLine - 1 : n.endLine), { titles }));
+    }
+    // ...then any from a separate notes file, matched by the checker.
     const text = result.notes ? io.read(result.notes.file) : null;
     if (result.notes && text !== null) {
       const lines = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
-      for (const s of result.notes.sections) {
-        if (!deck.byId.has(s.id)) continue;
-        const html = renderBody(bodyLines(lines, s.line, s.endLine), { titles });
-        if (html) notes[s.id] = notes[s.id] ? `${notes[s.id]}\n${html}` : html;
-      }
+      for (const s of result.notes.sections) if (s.matched) add(s.id, renderBody(bodyLines(lines, s.line, s.endLine), { titles }));
     }
   }
 

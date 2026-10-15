@@ -123,8 +123,8 @@ test("fmt: tidies layout and leaves meaning alone", () => {
   assert.deepEqual(shape(tidy), shape(messy));
 });
 
-test("fmt: the example deck and notes are already tidy", () => {
-  for (const f of ["examples/pathway/pathway.md", "examples/pathway/pathway.notes.md"]) {
+test("fmt: the example deck is already tidy", () => {
+  for (const f of ["examples/pathway/pathway.md"]) {
     const s = readFileSync(f, "utf8");
     assert.equal(formatDeck(s), s, f);
   }

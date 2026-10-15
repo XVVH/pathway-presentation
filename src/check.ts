@@ -174,14 +174,28 @@ export function checkDeck(deckPath: string, io: Io, opts: CheckOptions = {}): Ch
       notes = parseNotes(text, notesPath);
       out.push(...notes.diagnostics);
       const claimed = new Map<string, number>();
+      // Titles can repeat across stops; a title that names more than one stop names none.
+      const stopsByTitle = new Map<string, Stop[]>();
+      for (const st of deck.stops) stopsByTitle.set(slugify(st.title), [...(stopsByTitle.get(slugify(st.title)) ?? []), st]);
       for (const s of notes.sections) {
         // An explicit {#id} names the stop; otherwise the title must match a stop's title (or id).
-        const target = s.explicitId ? (deck.byId.has(s.id) ? s.id : null) : byTitle.get(slugify(s.title)) ?? (deck.byId.has(s.id) ? s.id : null);
+        const sameTitle = s.explicitId ? [] : stopsByTitle.get(slugify(s.title)) ?? [];
+        if (sameTitle.length > 1) {
+          out.push({
+            code: "notes-ambiguous", severity: "warning", file: notesPath, line: s.line,
+            message: `Notes for '${s.title}' could belong to ${sameTitle.length} stops with that title (lines ${sameTitle.map(x => x.line).join(", ")}), so they aren't shown. Add the id of the one you mean: ${sameTitle.map(x => `{#${x.id}}`).join(" or ")}.`,
+          });
+          continue;
+        }
+        const target = s.explicitId ? (deck.byId.has(s.id) ? s.id : null) : sameTitle[0]?.id ?? (deck.byId.has(s.id) ? s.id : null);
         if (target) {
           s.id = target;
+          s.matched = true;
+          const stop = deck.byId.get(target)!;
           const prev = claimed.get(target);
-          if (prev !== undefined) out.push({ code: "notes-duplicate", severity: "warning", file: notesPath, line: s.line, stop: target, message: `Notes for "${deck.byId.get(target)!.title}" already start on line ${prev}. Merge the two sections.` });
-          else claimed.set(target, s.line);
+          if (prev !== undefined) out.push({ code: "notes-duplicate", severity: "warning", file: notesPath, line: s.line, stop: target, message: `Notes for "${stop.title}" already start on line ${prev}. Merge the two sections.` });
+          else if (stop.notes.length) out.push({ code: "notes-duplicate", severity: "warning", file: notesPath, line: s.line, stop: target, message: `"${stop.title}" also has notes in the deck (line ${stop.notes[0].line}). Both are shown, one after the other; keep them in one place.` });
+          claimed.set(target, prev ?? s.line);
           continue;
         }
         const guess = guessId(s.title) ?? guessId(s.id);
@@ -196,13 +210,15 @@ export function checkDeck(deckPath: string, io: Io, opts: CheckOptions = {}): Ch
   out.sort((a, b) => (a.file === b.file ? 0 : a.file === file ? -1 : b.file === file ? 1 : a.file < b.file ? -1 : 1)
     || a.line - b.line || SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || (a.column ?? 0) - (b.column ?? 0));
   const count = (s: Diagnostic["severity"]) => out.filter(d => d.severity === s).length;
-  const noted = notes ? new Set(notes.sections.map(s => s.id)) : null;
+  // Notes written in the deck count as much as notes in a separate file.
+  const noted = new Set([...deck.stops.filter(st => st.notes.length).map(st => st.id), ...(notes?.sections.filter(n => n.matched).map(n => n.id) ?? [])]);
+  const anyNotes = !!notes || deck.stops.some(st => st.notes.length);
   return {
     deck, notes, estimates, diagnostics: out,
     summary: {
       errors: count("error"), warnings: count("warning"), infos: count("info"),
       stops: deck.stops.length, detours: deck.stops.filter(s => s.detour).length,
-      withNotes: noted ? deck.stops.filter(s => noted.has(s.id)).length : null,
+      withNotes: anyNotes ? deck.stops.filter(st => noted.has(st.id)).length : null,
     },
   };
 }

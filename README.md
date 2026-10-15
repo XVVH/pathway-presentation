@@ -22,6 +22,7 @@ node src/cli.ts build examples/pathway/pathway.md     # a folder to present from
 node src/cli.ts outline examples/pathway/pathway.md   # the map as a tree, and the route
 node src/cli.ts fmt --write examples/pathway/pathway.md
 node src/cli.ts render examples/pathway/pathway.md --all   # PNGs (needs Playwright)
+node src/cli.ts inline-notes talk.md --write          # move a separate notes file into the deck
 ```
 
 - `check` exits with 1 when the deck has errors (or warnings, with `--strict`).

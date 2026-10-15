@@ -25,7 +25,7 @@ export function formatCheck(r: CheckResult, style: Style): string {
   }
   const s = r.summary;
   const counts = [s.errors && plural(s.errors, "error"), s.warnings && plural(s.warnings, "warning"), s.infos && plural(s.infos, "note")].filter(Boolean).join(", ");
-  const facts = [plural(s.stops, "stop"), s.detours ? plural(s.detours, "detour") : null, s.withNotes !== null ? `notes for ${s.withNotes} of ${s.stops}` : "no notes file"].filter(Boolean).join(" · ");
+  const facts = [plural(s.stops, "stop"), s.detours ? plural(s.detours, "detour") : null, s.withNotes !== null ? `notes for ${s.withNotes} of ${s.stops}` : "no notes"].filter(Boolean).join(" · ");
   if (out.length) out.push("");
   out.push(s.errors ? `${red("✖")} ${counts} · ${facts}` : s.warnings || s.infos ? `${yellow("!")} ${counts} · ${facts}` : `${green("✓")} No problems · ${facts}`);
   return out.join("\n");
@@ -76,7 +76,7 @@ export function outlineJson(r: CheckResult) {
         bullets: s.blocks.reduce((a, b) => a + (b.kind === "list" ? b.items.filter(i => i.depth === 0).length : 0), 0),
         media: s.media.map(m => ({ src: m.src, kind: m.kind, wide: m.classes.includes("wide"), line: m.line })),
         links: s.links.map(l => l.target),
-        hasNotes: r.notes ? r.notes.sections.some(n => n.id === s.id) : null,
+        hasNotes: s.notes.length > 0 || (r.notes?.sections.some(n => n.matched && n.id === s.id) ?? false),
         card: { ratio: Number(est.ratio.toFixed(3)), fitted: est.fitted, layout: est.layout, overflow: est.overflow },
       };
     }),
