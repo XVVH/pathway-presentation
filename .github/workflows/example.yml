@@ -1,0 +1,44 @@
+name: example
+
+# Builds examples/pathway as an audience copy (no speaker notes) and publishes it
+# on GitHub Pages, so the README can link to a deck anyone can click through.
+# Publishing starts once Pages is turned on: Settings → Pages → Source: GitHub
+# Actions. Until then the job is skipped.
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref_name == github.event.repository.default_branch && github.event.repository.has_pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - id: pages
+        uses: actions/configure-pages@v5
+      # The deck's QR code points at where it's published.
+      - run: node src/cli.ts build examples/pathway/pathway.md --out site --url "${{ steps.pages.outputs.base_url }}/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

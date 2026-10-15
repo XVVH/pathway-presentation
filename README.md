@@ -3,6 +3,11 @@
 Talks as landscapes: a presentation framework where the content is a map and the
 talk is a route through it.
 
+**[Open the example deck](https://xvvh.github.io/pathway-presentation/)**, a talk
+about Pathway built from [examples/pathway/](examples/pathway/). Press → to walk
+it, or drag, zoom and click to explore. On a phone it's a scrolling strip. It's
+rebuilt on every push.
+
 - [DESIGN.md](DESIGN.md): the idea, the decisions so far, and the build plan.
 - [AGENTS.md](AGENTS.md): the deck format in full, for agents and people.
 - [examples/pathway/](examples/pathway/): a deck about Pathway, with notes and a
@@ -193,6 +198,8 @@ npm run e2e            # drive a built deck in Chromium (needs Playwright)
 npm run build          # optional: emit plain JavaScript to dist/ for older Node
 ```
 
+- **The example deck** is built and published to GitHub Pages by
+  `.github/workflows/example.yml` on every push to the default branch.
 - **The engine** lives in `src/runtime/` and is bundled into `runtime/pathway.js`,
   which is committed so building a deck needs no bundler. CI fails if it's stale.
 - **Size estimates.** The checker estimates card heights from font widths: measured
